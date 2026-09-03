@@ -4100,6 +4100,7 @@ function renderEnglish() {
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">告诉 AI 你的目标，自动生成每日学习任务</div>' +
       '</div>' +
       '<button class="btn-primary" id="engAiPlanBtn" style="white-space:nowrap;">生成计划</button>' +
+      '<button class="btn-secondary" id="engClearAiBtn" style="white-space:nowrap;padding:6px 10px;font-size:12px;color:#ff6b6b;border-color:#ff6b6b;">清空</button>' +
     '</div>' +
     '<div class="week-nav" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
       '<button class="btn-secondary" id="engPrevWeek" style="padding:4px 12px;font-size:12px;">← 上周</button>' +
@@ -4132,6 +4133,22 @@ function renderEnglish() {
   });
   // AI 生成计划
   document.getElementById('engAiPlanBtn').addEventListener('click', showEnglishAiPlanForm);
+  // 清空AI生成的任务
+  const clearAiBtn = document.getElementById('engClearAiBtn');
+  if (clearAiBtn) clearAiBtn.addEventListener('click', function() {
+    showConfirm({
+      title: '清空AI生成的学习任务',
+      message: '确定要删除所有AI生成的学习任务吗？此操作不可撤销。',
+      confirmText: '清空', danger: true,
+      onConfirm: async function() {
+        const all = await dbGetAll('english');
+        const aiTasks = all.filter(function(t) { return t.aiGenerated; });
+        for (const t of aiTasks) await dbDelete('english', t.id);
+        showToast('已清空 ' + aiTasks.length + ' 条AI生成的任务', 'success');
+        renderEnglish();
+      }
+    });
+  });
 
   // 周翻页
   if (window._englishWeekOffset === undefined) window._englishWeekOffset = 0;
@@ -5548,6 +5565,7 @@ function renderWorkouts() {
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">告诉 AI 你的目标，自动生成每日训练安排</div>' +
       '</div>' +
       '<button class="btn-primary" id="workoutAiBtn" style="white-space:nowrap;">生成计划</button>' +
+      '<button class="btn-secondary" id="workoutClearAiBtn" style="white-space:nowrap;padding:6px 10px;font-size:12px;color:#ff6b6b;border-color:#ff6b6b;">清空</button>' +
     '</div>' +
     '<div class="week-nav" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
       '<button class="btn-secondary" id="workoutPrevWeek" style="padding:4px 12px;font-size:12px;">← 上周</button>' +
@@ -5582,6 +5600,21 @@ function renderWorkouts() {
 
   const workoutAiBtn = document.getElementById('workoutAiBtn');
   if (workoutAiBtn) workoutAiBtn.addEventListener('click', showWorkoutAiPlanForm);
+  const workoutClearBtn = document.getElementById('workoutClearAiBtn');
+  if (workoutClearBtn) workoutClearBtn.addEventListener('click', function() {
+    showConfirm({
+      title: '清空AI生成的训练计划',
+      message: '确定要删除所有AI生成的训练记录吗？此操作不可撤销。',
+      confirmText: '清空', danger: true,
+      onConfirm: async function() {
+        const all = await dbGetAll('workouts');
+        const aiItems = all.filter(function(w) { return w.aiGenerated; });
+        for (const w of aiItems) await dbDelete('workouts', w.id);
+        showToast('已清空 ' + aiItems.length + ' 条AI生成的训练', 'success');
+        renderWorkouts();
+      }
+    });
+  });
 
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.onclick = function() { openWorkoutModal(); };
@@ -6549,6 +6582,7 @@ function renderBooks() {
         '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">输入书名，AI 帮你制定每日阅读计划</div>' +
       '</div>' +
       '<button class="btn-primary" id="bookAiBtn" style="white-space:nowrap;">生成计划</button>' +
+      '<button class="btn-secondary" id="bookClearAiBtn" style="white-space:nowrap;padding:6px 10px;font-size:12px;color:#ff6b6b;border-color:#ff6b6b;">清空</button>' +
     '</div>' +
     '<div id="booksShelfView"></div>' +
     '<div class="book-detail-view" id="booksDetailView"></div>';
@@ -6570,6 +6604,25 @@ function renderBooks() {
 
   const bookAiBtn = document.getElementById('bookAiBtn');
   if (bookAiBtn) bookAiBtn.addEventListener('click', showBookAiPlanForm);
+  const bookClearBtn = document.getElementById('bookClearAiBtn');
+  if (bookClearBtn) bookClearBtn.addEventListener('click', function() {
+    showConfirm({
+      title: '清空AI生成的阅读计划',
+      message: '确定要删除所有AI生成的书和阅读计划吗？此操作不可撤销。',
+      confirmText: '清空', danger: true,
+      onConfirm: async function() {
+        const books = await dbGetAll('books');
+        const aiBooks = books.filter(function(b) { return b.aiGenerated; });
+        for (const b of aiBooks) await dbDelete('books', b.id);
+        const items = await dbGetAll('customItems');
+        const aiItems = items.filter(function(i) { return i.aiGenerated; });
+        for (const i of aiItems) await dbDelete('customItems', i.id);
+        showToast('已清空 ' + (aiBooks.length + aiItems.length) + ' 条AI生成的数据', 'success');
+        renderBooks();
+        if (typeof renderSidebar === 'function') renderSidebar();
+      }
+    });
+  });
 
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.onclick = function() { openAddBookModal(); };
