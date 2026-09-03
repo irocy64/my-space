@@ -4399,25 +4399,37 @@ function showEnglishAiPlanForm() {
   });
 }
 
+// 通用：从文本中提取并解析JSON对象（从最长子串开始尝试）
+function extractJsonFromText(text) {
+  if (!text) return null;
+  // 先清理markdown代码块
+  let cleaned = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+  // 直接解析
+  try {
+    if (cleaned.startsWith('{') || cleaned.startsWith('[')) return JSON.parse(cleaned);
+  } catch(e) {}
+  // 找到第一个 { 或 [ 的位置
+  const firstBrace = cleaned.search(/[\[{]/);
+  if (firstBrace < 0) return null;
+  // 从最长子串开始尝试解析（逐步缩短）
+  const sub = cleaned.slice(firstBrace);
+  for (let len = sub.length; len > 10; len--) {
+    const candidate = sub.slice(0, len);
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && (parsed.plan || Array.isArray(parsed))) return parsed;
+    } catch(e) {}
+  }
+  return null;
+}
+
 // 从AI回复中解析英语学习计划（通用函数）
 function parseEnglishPlanFromText(reply) {
   if (!reply) return null;
   let data = null;
-  // 方法1：直接解析JSON
-  try {
-    const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
-    if (cleaned.startsWith('{')) data = JSON.parse(cleaned);
-  } catch(e) {}
-  // 方法2：正则提取JSON对象（更宽松）
-  if (!data) {
-    const jsonMatch = reply.match(/\{[\s\S]*?"plan"[\s\S]*?\}/);
-    if (jsonMatch) {
-      try {
-        data = JSON.parse(jsonMatch[0]);
-      } catch(e) {}
-    }
-  }
-  // 方法3：从markdown中按天提取任务（增强版）
+  // 方法1：通用JSON提取
+  data = extractJsonFromText(reply);
+  // 方法2：从markdown中按天提取任务（增强版）
   if (!data || !data.plan) {
     const plan = [];
     // 匹配更多天的格式：第1天、第一天、Day 1、Day1、day1、第 1 天
@@ -5501,23 +5513,11 @@ function showWorkoutAiPlanForm() {
 
 // 从AI回复解析健身计划
 function parseWorkoutPlanFromText(reply) {
+  if (!reply) return null;
   let data = null;
-  // 方法1：直接解析JSON
-  try {
-    const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
-    if (cleaned.startsWith('{')) data = JSON.parse(cleaned);
-  } catch(e) {}
-  // 方法2：正则提取JSON
-  if (!data) {
-    const jsonMatch = reply.match(/\{[\s\S]*?"plan"[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        let jsonStr = jsonMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
-        data = JSON.parse(jsonStr);
-      } catch(e) {}
-    }
-  }
-  // 方法3：从markdown按天提取
+  // 方法1：通用JSON提取
+  data = extractJsonFromText(reply);
+  // 方法2：从markdown按天提取
   if (!data || !data.plan) {
     const plan = [];
     const dayRegex = /(?:第\s*(\d+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
@@ -6475,20 +6475,10 @@ function showBookAiPlanForm() {
 
 // 从AI回复解析阅读计划
 function parseBookPlanFromText(reply) {
+  if (!reply) return null;
   let data = null;
-  try {
-    const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
-    if (cleaned.startsWith('{')) data = JSON.parse(cleaned);
-  } catch(e) {}
-  if (!data) {
-    const jsonMatch = reply.match(/\{[\s\S]*?"plan"[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        let jsonStr = jsonMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
-        data = JSON.parse(jsonStr);
-      } catch(e) {}
-    }
-  }
+  // 方法1：通用JSON提取
+  data = extractJsonFromText(reply);
   // 从markdown按天提取
   if (!data || !data.plan) {
     const plan = [];
