@@ -6665,28 +6665,10 @@ function appendAiMessage(role, content) {
   const container = document.getElementById('aiMessages');
   const div = document.createElement('div');
   div.className = 'ai-msg ' + role;
-  let html = '<div class="msg-avatar">' + (role === 'user' ? '🧑' : '🤖') + '</div>' +
+  div.innerHTML = '<div class="msg-avatar">' + (role === 'user' ? '🧑' : '🤖') + '</div>' +
     '<div class="msg-bubble">' + escapeHtml(content) + '</div>';
-  // AI回复后添加保存到模块按钮
-  if (role === 'assistant' && !content.startsWith('出错了') && !content.startsWith('请先')) {
-    html += '<div class="ai-save-row" style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">' +
-      '<button class="ai-save-btn" data-action="save-note" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">📝 存为笔记</button>' +
-      '<button class="ai-save-btn" data-action="save-task" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">✅ 存为待办</button>' +
-      '<button class="ai-save-btn" data-action="save-idea" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">💡 存为灵感</button>' +
-      '<button class="ai-save-btn" data-action="save-custom" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">📁 存到自定义模块</button>' +
-    '</div>';
-  }
-  div.innerHTML = html;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
-  // 绑定保存按钮事件
-  if (role === 'assistant') {
-    div.querySelectorAll('.ai-save-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        saveAiContentToModule(btn.dataset.action, content);
-      });
-    });
-  }
   return div;
 }
 
@@ -6822,25 +6804,235 @@ async function callDoubaoApi(messages) {
 async function sendAiMessage(text) {
   if (!text.trim()) return;
   if (!aiApiKey) {
-    appendAiMessage('assistant', '请先在下方输入框粘贴你的火山引擎豆包 API Key，点保存后再使用。');
+    appendAiMessage('assistant', '请先在「设置」页面配置火山引擎豆包 API Key。');
     return;
   }
   appendAiMessage('user', text);
   aiConversation.push({ role: 'user', content: text });
   document.getElementById('aiInput').value = '';
-  showAiTyping();
   document.getElementById('aiSendBtn').disabled = true;
+
+  // 创建AI消息容器（流式更新）
+  const container = document.getElementById('aiMessages');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'ai-msg assistant';
+  msgDiv.innerHTML = '<div class="msg-avatar">🤖</div><div class="msg-bubble" id="aiStreamContent"><div class="ai-typing"><span></span><span></span><span></span></div></div>';
+  container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight;
+
   try {
-    const reply = await callDoubaoApi(aiConversation);
-    removeAiTyping();
-    appendAiMessage('assistant', reply);
-    aiConversation.push({ role: 'assistant', content: reply });
-    saveAiHistory();
+    const body = {
+      model: AI_MODEL,
+      messages: aiConversation,
+      temperature: 0.7,
+      max_tokens: 1024,
+      stream: true
+    };
+    if (window._aiThinkingEnabled) {
+      body.thinking = { type: 'enabled' };
+    } else {
+      body.thinking = { type: 'disabled' };
+    }
+
+    const res = await fetch(AI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + aiApiKey
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error('API 错误 ' + res.status + ': ' + errText.slice(0, 200));
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let thinkingContent = '';
+    const bubble = document.getElementById('aiStreamContent');
+    bubble.innerHTML = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') continue;
+          try {
+            const json = JSON.parse(data);
+            const delta = json.choices?.[0]?.delta;
+            if (delta) {
+              if (delta.reasoning_content) {
+                thinkingContent += delta.reasoning_content;
+                bubble.innerHTML = '<div style="color:var(--text-light);font-size:12px;border-left:2px solid var(--primary);padding-left:8px;margin-bottom:8px;">💭 思考中...<br>' + escapeHtml(thinkingContent) + '</div>' + escapeHtml(fullContent);
+              }
+              if (delta.content) {
+                fullContent += delta.content;
+                const thinkingHtml = thinkingContent ? '<div style="color:var(--text-light);font-size:12px;border-left:2px solid var(--primary);padding-left:8px;margin-bottom:8px;">💭 思考过程<br>' + escapeHtml(thinkingContent) + '</div>' : '';
+                bubble.innerHTML = thinkingHtml + escapeHtml(fullContent);
+              }
+              container.scrollTop = container.scrollHeight;
+            }
+          } catch(e) {}
+        }
+      }
+    }
+
+    // 流式完成，添加保存按钮
+    if (fullContent.trim()) {
+      aiConversation.push({ role: 'assistant', content: fullContent });
+      saveAiHistory();
+      addSaveButtonsToMessage(msgDiv, fullContent);
+    }
   } catch(err) {
-    removeAiTyping();
-    appendAiMessage('assistant', '出错了：' + err.message + '\n\n请检查 API Key 是否正确，或网络是否可访问火山引擎。');
+    const bubble = document.getElementById('aiStreamContent');
+    if (bubble) bubble.innerHTML = '出错了：' + err.message + '\\n\\n请检查 API Key 是否正确，或网络是否可访问火山引擎。';
   }
   document.getElementById('aiSendBtn').disabled = false;
+}
+
+// 给AI消息添加保存到模块按钮
+function addSaveButtonsToMessage(msgDiv, content) {
+  const saveRow = document.createElement('div');
+  saveRow.style.cssText = 'display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;';
+  saveRow.innerHTML =
+    '<button class="ai-save-module-btn" data-module="english" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">📚 存到英语</button>' +
+    '<button class="ai-save-module-btn" data-module="books" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">📖 存到读书</button>' +
+    '<button class="ai-save-module-btn" data-module="workouts" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">💪 存到健身</button>' +
+    '<button class="ai-save-module-btn" data-module="media" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">🎬 存到自媒体</button>' +
+    '<button class="ai-save-module-btn" data-module="tasks" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">✅ 存到待办</button>' +
+    '<button class="ai-save-module-btn" data-module="custom" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">📁 其他模块</button>';
+  msgDiv.appendChild(saveRow);
+  saveRow.querySelectorAll('.ai-save-module-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      saveAiToModule(btn.dataset.module, content);
+    });
+  });
+}
+
+// 保存AI内容到具体模块
+async function saveAiToModule(module, content) {
+  const title = content.slice(0, 30).replace(/\n/g, ' ') + (content.length > 30 ? '...' : '');
+  try {
+    if (module === 'english') {
+      // 存到英语 - 作为学习笔记/计划
+      await dbAdd('english', {
+        id: genId(),
+        date: todayStr(),
+        type: 'other',
+        content: content,
+        duration: 0,
+        completed: false,
+        createdAt: Date.now(),
+        aiGenerated: true
+      });
+      showToast('已保存到英语学习模块', 'success');
+    } else if (module === 'books') {
+      // 存到读书
+      await dbAdd('books', {
+        id: genId(),
+        title: title,
+        author: 'AI生成',
+        status: 'reading',
+        rating: 0,
+        notes: content,
+        createdAt: Date.now(),
+        aiGenerated: true
+      });
+      showToast('已保存到读书模块', 'success');
+    } else if (module === 'workouts') {
+      // 存到健身
+      await dbAdd('workouts', {
+        id: genId(),
+        date: todayStr(),
+        type: 'AI计划',
+        duration: 0,
+        exercises: [],
+        notes: content,
+        createdAt: Date.now(),
+        aiGenerated: true
+      });
+      showToast('已保存到健身模块', 'success');
+    } else if (module === 'media') {
+      // 存到自媒体
+      await dbAdd('media', {
+        id: genId(),
+        title: title,
+        status: 'idea',
+        publishDate: null,
+        platform: '',
+        idea: content,
+        notes: 'AI对话生成',
+        views: null, likes: null, comments: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        aiGenerated: true
+      });
+      showToast('已保存到自媒体灵感库', 'success');
+    } else if (module === 'tasks') {
+      // 存到待办
+      await dbAdd('tasks', {
+        id: genId(),
+        title: title,
+        content: content,
+        date: todayStr(),
+        completed: false,
+        createdAt: Date.now(),
+        aiGenerated: true
+      });
+      showToast('已保存到待办事项', 'success');
+    } else if (module === 'custom') {
+      // 选择自定义模块
+      const customModules = window._moduleConfig?.customModules || [];
+      const allModules = [
+        { id: 'experiments', name: '🧪 实验记录' },
+        { id: 'meals', name: '🍽️ 饮食记录' },
+        { id: 'games', name: '🎮 游戏' }
+      ].concat(customModules.map(m => ({ id: m.id, name: m.icon + ' ' + m.name })));
+      if (allModules.length === 0) {
+        showToast('没有其他模块可选', 'error');
+        return;
+      }
+      const moduleNames = allModules.map((m, i) => (i+1) + '. ' + m.name).join('\\n');
+      const idx = prompt('选择要保存到的模块：\\n' + moduleNames);
+      if (!idx) return;
+      const moduleIdx = parseInt(idx) - 1;
+      if (isNaN(moduleIdx) || moduleIdx < 0 || moduleIdx >= allModules.length) {
+        showToast('选择无效', 'error');
+        return;
+      }
+      const target = allModules[moduleIdx];
+      if (target.id.startsWith('custom-')) {
+        await dbAdd('customItems', {
+          id: genId(),
+          moduleId: target.id,
+          title: title,
+          content: content,
+          date: todayStr(),
+          createdAt: Date.now()
+        });
+      } else {
+        // 预设模块用通用格式存到对应store
+        await dbAdd(target.id, {
+          id: genId(),
+          title: title,
+          content: content,
+          date: todayStr(),
+          createdAt: Date.now(),
+          aiGenerated: true
+        });
+      }
+      showToast('已保存到「' + target.name + '」', 'success');
+    }
+  } catch(err) {
+    showToast('保存失败：' + err.message, 'error');
+  }
 }
 
 async function saveAiHistory() {
