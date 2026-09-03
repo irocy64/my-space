@@ -6866,7 +6866,9 @@ async function sendAiMessage(text) {
     while (!streamDone) {
       const { done, value } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      const chunk = decoder.decode(value, { stream: true });
+      console.log('[AI Stream] chunk:', chunk.slice(0, 200));
+      buffer += chunk;
       // 按行分割，保留不完整的行在缓冲区
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
@@ -6889,6 +6891,25 @@ async function sendAiMessage(text) {
             }
           }
         } catch(e) {}
+      }
+    }
+
+    // 处理缓冲区剩余的最后一行
+    if (buffer.trim()) {
+      const trimmed = buffer.trim();
+      if (trimmed.startsWith('data:')) {
+        const data = trimmed.slice(5).trim();
+        if (data !== '[DONE]') {
+          try {
+            const json = JSON.parse(data);
+            const delta = json.choices?.[0]?.delta;
+            if (delta) {
+              if (delta.reasoning_content) thinkingContent += delta.reasoning_content;
+              if (delta.content) fullContent += delta.content;
+              updateBubble();
+            }
+          } catch(e) {}
+        }
       }
     }
 
