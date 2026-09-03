@@ -4466,7 +4466,7 @@ function extractJsonFromText(text) {
   try {
     if (cleaned.startsWith('{') || cleaned.startsWith('[')) return JSON.parse(cleaned);
   } catch(e) {}
-  // 用括号深度匹配找到完整的JSON对象（处理字符串、转义）
+  // 用括号深度匹配找到完整的JSON对象
   const start = cleaned.search(/[\[{]/);
   if (start < 0) return null;
   const openChar = cleaned[start];
@@ -4482,14 +4482,57 @@ function extractJsonFromText(text) {
     else if (ch === closeChar) {
       depth--;
       if (depth === 0) {
-        const jsonStr = cleaned.slice(start, i + 1);
+        let jsonStr = cleaned.slice(start, i + 1);
+        // 尝试直接解析
         try {
           const parsed = JSON.parse(jsonStr);
+          if (parsed && (parsed.plan || Array.isArray(parsed))) return parsed;
+        } catch(e) {}
+        // 尝试修复常见JSON错误
+        try {
+          let fixed = jsonStr
+            .replace(/,\s*([}\]])/g, '$1')  // 去掉尾逗号
+            .replace(/'/g, '"')              // 单引号转双引号（可能破坏内容，但作为fallback）
+            .replace(/\n/g, ' ')             // 换行转空格
+            .replace(/\t/g, ' ');
+          const parsed = JSON.parse(fixed);
           if (parsed && (parsed.plan || Array.isArray(parsed))) return parsed;
         } catch(e) {}
         break;
       }
     }
+  }
+  // 最后手段：用正则提取所有 day/tasks 块手动组装
+  if (text.includes('"day"') && text.includes('"tasks"')) {
+    try {
+      const plan = [];
+      const dayBlocks = text.match(/\{"day"\s*:\s*\d+\s*,\s*"tasks"\s*:\s*\[.*?\]\s*\}/g) || [];
+      for (const block of dayBlocks) {
+        try {
+          const dayMatch = block.match(/"day"\s*:\s*(\d+)/);
+          const tasksMatch = block.match(/"tasks"\s*:\s*\[(.*)\]/);
+          if (dayMatch && tasksMatch) {
+            const day = parseInt(dayMatch[1]);
+            const tasks = [];
+            const taskBlocks = tasksMatch[1].match(/\{[^{}]*\}/g) || [];
+            for (const tb of taskBlocks) {
+              const typeMatch = tb.match(/"type"\s*:\s*"([^"]*)"/);
+              const contentMatch = tb.match(/"content"\s*:\s*"([^"]*)"/);
+              const durMatch = tb.match(/"duration"\s*:\s*(\d+)/);
+              if (contentMatch) {
+                tasks.push({
+                  type: typeMatch ? typeMatch[1] : 'other',
+                  content: contentMatch[1],
+                  duration: durMatch ? parseInt(durMatch[1]) : 30
+                });
+              }
+            }
+            if (tasks.length > 0) plan.push({ day: day, tasks: tasks });
+          }
+        } catch(e) {}
+      }
+      if (plan.length > 0) return { plan: plan };
+    } catch(e) {}
   }
   return null;
 }
