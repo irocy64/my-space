@@ -6656,27 +6656,67 @@ function showBookAiPlanForm() {
 function parseBookPlanFromText(reply) {
   if (!reply) return null;
   let data = null;
-  // 方法1：通用JSON提取
   data = extractJsonFromText(reply);
-  // 从markdown按天提取
   if (!data || !data.plan) {
     const plan = [];
-    const dayRegex = /(?:第\s*(\d+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
-    let match;
-    const dayPositions = [];
-    while ((match = dayRegex.exec(reply)) !== null) {
-      const dayNum = parseInt(match[1] || match[2] || match[3]);
-      dayPositions.push({ day: dayNum, start: match.index });
+    const cleanedReply = cleanMarkdown(reply);
+    // 识别阶段
+    const phaseRegex = /(?:第\s*(\d+)\s*[-~到至]\s*(\d+)\s*天|阶段\s*[一二三四五六七八九十\d]+|Phase\s*\d+)/gi;
+    const phases = [];
+    let pm;
+    while ((pm = phaseRegex.exec(cleanedReply)) !== null) {
+      phases.push({ start: pm[1] ? parseInt(pm[1]) : null, end: pm[2] ? parseInt(pm[2]) : null, startIndex: pm.index });
     }
-    for (let i = 0; i < dayPositions.length; i++) {
-      const dayInfo = dayPositions[i];
-      const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : reply.length;
-      const dayText = reply.slice(dayInfo.start, end);
-      // 提取阅读内容
+    // 识别 Day 标记
+    const dayRegex = /(?:Day\s*(\d+)|day\s*(\d+)|第\s*(\d+|[一二三四五六七八九十]+)\s*天)/gi;
+    const dayPositions = [];
+    const chineseNumMap = { '一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9, '十':10 };
+    let dm;
+    while ((dm = dayRegex.exec(cleanedReply)) !== null) {
+      let dayNum = parseInt(dm[1] || dm[2] || dm[3]);
+      if (isNaN(dayNum) && dm[3]) dayNum = chineseNumMap[dm[3]] || 1;
+      dayPositions.push({ day: dayNum, start: dm.index });
+    }
+    const processDay = function(globalDay, start, end) {
+      const dayText = cleanedReply.slice(start, end);
+      let content = '';
       const contentMatch = dayText.match(/[:：]\s*(.+?)(?:\n|$)/);
-      let content = contentMatch ? contentMatch[1].trim() : dayText.replace(/第\s*\d+\s*天[：:]?\s*/, '').trim().slice(0, 100);
-      if (content && content.length > 2) {
-        plan.push({ day: dayInfo.day, content: content });
+      if (contentMatch) {
+        content = cleanMarkdown(contentMatch[1].trim());
+      } else {
+        content = cleanMarkdown(dayText.replace(/Day\s*\d+[：:]?\s*/i, '').replace(/第\s*\d+\s*天[：:]?\s*/, '').trim()).slice(0, 150);
+      }
+      if (content && content.length > 2 && !/^(第.+天|阶段|Phase|核心原则|目标|说明)/.test(content)) {
+        plan.push({ day: globalDay, content: content });
+      }
+    };
+    if (phases.length > 0 && dayPositions.length > 0) {
+      for (let i = 0; i < dayPositions.length; i++) {
+        const dayInfo = dayPositions[i];
+        let currentPhase = null;
+        for (let j = phases.length - 1; j >= 0; j--) {
+          if (phases[j].startIndex < dayInfo.start) { currentPhase = phases[j]; break; }
+        }
+        let globalDay = dayInfo.day;
+        if (currentPhase && currentPhase.start !== null) globalDay = currentPhase.start + dayInfo.day - 1;
+        const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : cleanedReply.length;
+        processDay(globalDay, dayInfo.start, end);
+      }
+    } else if (dayPositions.length > 0) {
+      for (let i = 0; i < dayPositions.length; i++) {
+        const dayInfo = dayPositions[i];
+        const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : cleanedReply.length;
+        processDay(dayInfo.day, dayInfo.start, end);
+      }
+    } else {
+      // 按段落分割
+      const sections = cleanedReply.split(/\n(?=\d+[.、\s])|\n(?=##)/);
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i].trim();
+        if (section.length > 10 && !/^(第.+天|阶段|Phase|核心原则|节奏|目标)/.test(section)) {
+          const content = cleanMarkdown(section.slice(0, 150));
+          if (content.length > 5) plan.push({ day: i + 1, content: content });
+        }
       }
     }
     if (plan.length > 0) data = { plan: plan };
