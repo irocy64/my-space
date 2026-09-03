@@ -2207,6 +2207,9 @@ body::before {
 .custom-item .ci-actions button { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text-light); font-size: 12px; cursor: pointer; }
 .custom-item .ci-actions button:hover { border-color: var(--primary); color: var(--primary); }
 .custom-item .ci-actions button.danger:hover { border-color: #ff6b6b; color: #ff6b6b; }
+.custom-item.completed { opacity: 0.6; }
+.custom-item.completed .ci-title span { text-decoration: line-through; }
+.custom-item.completed .ci-content { text-decoration: line-through; }
 /* ===== AI 助手 ===== */
 .ai-assistant-btn {
   position: fixed; bottom: 24px; right: 24px; z-index: 999;
@@ -2639,16 +2642,29 @@ async function renderCustomModule(moduleId) {
   } else {
     container.innerHTML = '<div class="custom-list" id="customList">' +
       items.map(function(item) {
-        return '<div class="custom-item" data-id="' + item.id + '">' +
+        return '<div class="custom-item ' + (item.completed ? 'completed' : '') + '" data-id="' + item.id + '">' +
+          '<input type="checkbox" class="ci-checkbox" ' + (item.completed ? 'checked' : '') + ' style="margin-right:8px;cursor:pointer;">' +
+          '<div style="flex:1;">' +
           '<div class="ci-title"><span>' + escapeHtml(item.title || '无标题') + '</span>' +
           '<span class="ci-date">' + (item.date ? formatDateCN(item.date) : '') + '</span></div>' +
           '<div class="ci-content">' + escapeHtml(item.content || '').slice(0, 200) + (item.content && item.content.length > 200 ? '...' : '') + '</div>' +
+          '</div>' +
           '<div class="ci-actions">' +
-          '<button class="ci-edit">✏️ 编辑</button>' +
-          '<button class="ci-delete danger">🗑️ 删除</button>' +
+          '<button class="ci-edit">✏️</button>' +
+          '<button class="ci-delete danger">🗑️</button>' +
           '</div></div>';
       }).join('') + '</div>';
     container.querySelectorAll('.custom-item').forEach(function(el) {
+      // 勾选完成
+      el.querySelector('.ci-checkbox').addEventListener('change', async function() {
+        const item = items.find(function(i){ return i.id === el.dataset.id; });
+        if (item) {
+          item.completed = this.checked;
+          await dbPut('customItems', item);
+          el.classList.toggle('completed', this.checked);
+          showToast(this.checked ? '已标记完成' : '已取消完成', 'success');
+        }
+      });
       el.querySelector('.ci-edit').addEventListener('click', function(e) {
         e.stopPropagation();
         const item = items.find(function(i){ return i.id === el.dataset.id; });
