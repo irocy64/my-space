@@ -4461,23 +4461,35 @@ function showEnglishAiPlanForm() {
 // 通用：从文本中提取并解析JSON对象（从最长子串开始尝试）
 function extractJsonFromText(text) {
   if (!text) return null;
-  // 先清理markdown代码块
   let cleaned = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
   // 直接解析
   try {
     if (cleaned.startsWith('{') || cleaned.startsWith('[')) return JSON.parse(cleaned);
   } catch(e) {}
-  // 找到第一个 { 或 [ 的位置
-  const firstBrace = cleaned.search(/[\[{]/);
-  if (firstBrace < 0) return null;
-  // 从最长子串开始尝试解析（逐步缩短）
-  const sub = cleaned.slice(firstBrace);
-  for (let len = sub.length; len > 10; len--) {
-    const candidate = sub.slice(0, len);
-    try {
-      const parsed = JSON.parse(candidate);
-      if (parsed && (parsed.plan || Array.isArray(parsed))) return parsed;
-    } catch(e) {}
+  // 用括号深度匹配找到完整的JSON对象（处理字符串、转义）
+  const start = cleaned.search(/[\[{]/);
+  if (start < 0) return null;
+  const openChar = cleaned[start];
+  const closeChar = openChar === '{' ? '}' : ']';
+  let depth = 0, inString = false, escape = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\') { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === openChar) depth++;
+    else if (ch === closeChar) {
+      depth--;
+      if (depth === 0) {
+        const jsonStr = cleaned.slice(start, i + 1);
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed && (parsed.plan || Array.isArray(parsed))) return parsed;
+        } catch(e) {}
+        break;
+      }
+    }
   }
   return null;
 }
