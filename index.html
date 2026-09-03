@@ -5634,37 +5634,67 @@ function showWorkoutAiPlanForm() {
 function parseWorkoutPlanFromText(reply) {
   if (!reply) return null;
   let data = null;
-  // 方法1：通用JSON提取
   data = extractJsonFromText(reply);
-  // 方法2：从markdown按天提取
   if (!data || !data.plan) {
     const plan = [];
-    const dayRegex = /(?:第\s*(\d+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
-    let match;
-    const dayPositions = [];
-    while ((match = dayRegex.exec(reply)) !== null) {
-      const dayNum = parseInt(match[1] || match[2] || match[3]);
-      dayPositions.push({ day: dayNum, start: match.index });
+    const cleanedReply = cleanMarkdown(reply);
+    // 识别阶段
+    const phaseRegex = /(?:第\s*(\d+)\s*[-~到至]\s*(\d+)\s*天|阶段\s*[一二三四五六七八九十\d]+|Phase\s*\d+|第\s*(\d+)\s*周)/gi;
+    const phases = [];
+    let pm;
+    while ((pm = phaseRegex.exec(cleanedReply)) !== null) {
+      phases.push({ start: pm[1] ? parseInt(pm[1]) : null, end: pm[2] ? parseInt(pm[2]) : null, startIndex: pm.index });
     }
-    for (let i = 0; i < dayPositions.length; i++) {
-      const dayInfo = dayPositions[i];
-      const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : reply.length;
-      const dayText = reply.slice(dayInfo.start, end);
-      // 提取训练部位
+    // 识别 Day 标记
+    const dayRegex = /(?:Day\s*(\d+)|day\s*(\d+)|第\s*(\d+|[一二三四五六七八九十]+)\s*天|星期[一二三四五六日天]\s*训练)/gi;
+    const dayPositions = [];
+    const chineseNumMap = { '一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '日':7, '天':7 };
+    let dm;
+    while ((dm = dayRegex.exec(cleanedReply)) !== null) {
+      let dayNum = parseInt(dm[1] || dm[2] || dm[3]);
+      if (isNaN(dayNum) && dm[3]) dayNum = chineseNumMap[dm[3]] || 1;
+      dayPositions.push({ day: dayNum, start: dm.index });
+    }
+    const processDay = function(globalDay, start, end) {
+      const dayText = cleanedReply.slice(start, end);
       let muscleGroup = '';
-      const muscleMatch = dayText.match(/(胸|背|腿|肩|手臂|核心|有氧|休息|全身|推拉腿|推|拉)/);
+      const muscleMatch = dayText.match(/(胸|背|腿|肩|手臂|核心|有氧|休息|全身|推拉腿|推日|拉日|腿日)/);
       if (muscleMatch) muscleGroup = muscleMatch[1];
-      // 提取动作
-      const exerciseLines = dayText.match(/[-*]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
+      const exerciseLines = dayText.match(/[-*•◦]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
       const exercises = [];
       for (const line of exerciseLines) {
-        const name = line.replace(/^[-*]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
-        if (name && name.length > 1 && name.length < 50) {
-          exercises.push({ name: name, weight: null, sets: 3, reps: '12', notes: '' });
+        let name = line.replace(/^[-*•◦]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
+        name = cleanMarkdown(name);
+        if (name && name.length > 1 && name.length < 80 && !/^(第.+天|阶段|Phase|核心原则|目标|说明)/.test(name)) {
+          let sets = 3, reps = '12';
+          const setsMatch = name.match(/(\d+)\s*组/);
+          if (setsMatch) sets = parseInt(setsMatch[1]);
+          const repsMatch = name.match(/(\d+)\s*(次|个|rep)/i);
+          if (repsMatch) reps = repsMatch[1];
+          exercises.push({ name: name, weight: null, sets: sets, reps: reps, notes: '' });
         }
       }
       if (muscleGroup || exercises.length > 0) {
-        plan.push({ day: dayInfo.day, muscleGroup: muscleGroup || '综合训练', duration: 60, exercises: exercises, notes: '' });
+        plan.push({ day: globalDay, muscleGroup: muscleGroup || '综合训练', duration: 60, exercises: exercises, notes: '' });
+      }
+    };
+    if (phases.length > 0 && dayPositions.length > 0) {
+      for (let i = 0; i < dayPositions.length; i++) {
+        const dayInfo = dayPositions[i];
+        let currentPhase = null;
+        for (let j = phases.length - 1; j >= 0; j--) {
+          if (phases[j].startIndex < dayInfo.start) { currentPhase = phases[j]; break; }
+        }
+        let globalDay = dayInfo.day;
+        if (currentPhase && currentPhase.start !== null) globalDay = currentPhase.start + dayInfo.day - 1;
+        const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : cleanedReply.length;
+        processDay(globalDay, dayInfo.start, end);
+      }
+    } else if (dayPositions.length > 0) {
+      for (let i = 0; i < dayPositions.length; i++) {
+        const dayInfo = dayPositions[i];
+        const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : cleanedReply.length;
+        processDay(dayInfo.day, dayInfo.start, end);
       }
     }
     if (plan.length > 0) data = { plan: plan };
