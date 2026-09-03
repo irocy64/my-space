@@ -1,0 +1,26 @@
+{
+  "name": "我的空间 - 个人专属APP",
+  "short_name": "我的空间",
+  "description": "五条悟主题的个人离线管理工具，涵盖计划、学习、健身、饮食、实验等模块",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0e1a",
+  "theme_color": "#4fc3f7",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icon.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
