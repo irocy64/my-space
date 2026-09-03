@@ -4465,67 +4465,120 @@ function extractJsonFromText(text) {
   return null;
 }
 
-// 从AI回复中解析英语学习计划（通用函数）
+// 清理markdown标记
+function cleanMarkdown(text) {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/###?\s*/g, '')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/^[-*•◦]\s+/gm, '')
+    .replace(/^\d+[.、]\s+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// 从文本中提取任务列表
+function extractTasksFromText(text) {
+  const tasks = [];
+  if (!text) return tasks;
+  const taskLines = text.match(/[-*•◦]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
+  for (const line of taskLines) {
+    let content = line.replace(/^[-*•◦]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
+    content = cleanMarkdown(content);
+    if (content && content.length > 2 && content.length < 200) {
+      if (/^(第.+天|阶段|Phase|核心原则|节奏|目标|说明)/.test(content)) continue;
+      let type = 'other';
+      if (/单词|词汇|vocab|word|背|高频词/.test(content)) type = 'vocabulary';
+      else if (/阅读|read|reading|仔细阅读|长篇阅读|篇章|精读/.test(content)) type = 'reading';
+      else if (/听力|listen|listening|精听|泛听|听写/.test(content)) type = 'listening';
+      else if (/写作|作文|write|writing|翻译|translation|范文/.test(content)) type = 'writing';
+      else if (/口语|speak|speaking|跟读|朗读/.test(content)) type = 'speaking';
+      let duration = 30;
+      const durMatch = content.match(/(\d+)\s*(分钟|min|minute)/i);
+      if (durMatch) duration = parseInt(durMatch[1]);
+      tasks.push({ type: type, content: content, duration: duration });
+    }
+  }
+  if (tasks.length === 0) {
+    const lines = text.split('\n').filter(function(l) {
+      const t = l.trim();
+      return t.length > 5 && t.length < 200 && !/^(第.+天|阶段|Phase|核心原则|节奏|目标|说明|###)/.test(t);
+    });
+    for (const line of lines.slice(0, 5)) {
+      const content = cleanMarkdown(line.trim());
+      if (content && content.length > 5) {
+        let type = 'other';
+        if (/单词|词汇|背/.test(content)) type = 'vocabulary';
+        else if (/阅读|精读/.test(content)) type = 'reading';
+        else if (/听力|精听/.test(content)) type = 'listening';
+        else if (/写作|翻译/.test(content)) type = 'writing';
+        let duration = 30;
+        const durMatch = content.match(/(\d+)\s*(分钟|min)/i);
+        if (durMatch) duration = parseInt(durMatch[1]);
+        tasks.push({ type: type, content: content, duration: duration });
+      }
+    }
+  }
+  return tasks;
+}
+
+// 从AI回复中解析英语学习计划（支持按阶段分组）
 function parseEnglishPlanFromText(reply) {
   if (!reply) return null;
   let data = null;
-  // 方法1：通用JSON提取
   data = extractJsonFromText(reply);
-  // 方法2：从markdown中按天提取任务（增强版）
   if (!data || !data.plan) {
     const plan = [];
-    // 匹配更多天的格式：第1天、第一天、Day 1、Day1、day1、第 1 天
-    const dayRegex = /(?:第\s*(\d+|[一二三四五六七八九十]+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
-    let match;
+    const cleanedReply = cleanMarkdown(reply);
+    // 识别阶段（第1-7天、第8-21天）
+    const phaseRegex = /(?:第\s*(\d+)\s*[-~到至]\s*(\d+)\s*天|阶段\s*[一二三四五六七八九十\d]+|Phase\s*\d+)/gi;
+    const phases = [];
+    let pm;
+    while ((pm = phaseRegex.exec(cleanedReply)) !== null) {
+      phases.push({ start: pm[1] ? parseInt(pm[1]) : null, end: pm[2] ? parseInt(pm[2]) : null, startIndex: pm.index });
+    }
+    // 识别 Day 标记
+    const dayRegex = /(?:Day\s*(\d+)|day\s*(\d+)|第\s*(\d+|[一二三四五六七八九十]+)\s*天)/gi;
     const dayPositions = [];
     const chineseNumMap = { '一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9, '十':10 };
-    while ((match = dayRegex.exec(reply)) !== null) {
-      let dayNum = parseInt(match[1] || match[2] || match[3]);
-      if (isNaN(dayNum) && match[1]) dayNum = chineseNumMap[match[1]] || 1;
-      dayPositions.push({ day: dayNum, start: match.index });
+    let dm;
+    while ((dm = dayRegex.exec(cleanedReply)) !== null) {
+      let dayNum = parseInt(dm[1] || dm[2] || dm[3]);
+      if (isNaN(dayNum) && dm[3]) dayNum = chineseNumMap[dm[3]] || 1;
+      dayPositions.push({ day: dayNum, start: dm.index });
     }
-    // 如果没找到"第X天"，尝试按 ## 标题或数字编号分段
-    if (dayPositions.length === 0) {
-      const sections = reply.split(/\n(?=\d+[.、\s])|\n(?=##)/);
-      if (sections.length > 1) {
-        for (let i = 0; i < sections.length; i++) {
-          const section = sections[i].trim();
-          if (section.length > 10) {
-            dayPositions.push({ day: i + 1, start: reply.indexOf(section) });
-          }
+    if (phases.length > 0 && dayPositions.length > 0) {
+      for (let i = 0; i < dayPositions.length; i++) {
+        const dayInfo = dayPositions[i];
+        let currentPhase = null;
+        for (let j = phases.length - 1; j >= 0; j--) {
+          if (phases[j].startIndex < dayInfo.start) { currentPhase = phases[j]; break; }
+        }
+        let globalDay = dayInfo.day;
+        if (currentPhase && currentPhase.start !== null) globalDay = currentPhase.start + dayInfo.day - 1;
+        const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : cleanedReply.length;
+        const tasks = extractTasksFromText(cleanedReply.slice(dayInfo.start, end));
+        if (tasks.length > 0) plan.push({ day: globalDay, tasks: tasks });
+      }
+    } else if (dayPositions.length > 0) {
+      for (let i = 0; i < dayPositions.length; i++) {
+        const dayInfo = dayPositions[i];
+        const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : cleanedReply.length;
+        const tasks = extractTasksFromText(cleanedReply.slice(dayInfo.start, end));
+        if (tasks.length > 0) plan.push({ day: dayInfo.day, tasks: tasks });
+      }
+    } else {
+      const sections = cleanedReply.split(/\n(?=\d+[.、\s])|\n(?=##)/);
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i].trim();
+        if (section.length > 10 && !/^(第.+天|阶段|Phase|核心原则|节奏)/.test(section)) {
+          const tasks = extractTasksFromText(section);
+          if (tasks.length > 0) plan.push({ day: i + 1, tasks: tasks });
         }
       }
-    }
-    for (let i = 0; i < dayPositions.length; i++) {
-      const dayInfo = dayPositions[i];
-      const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : reply.length;
-      const dayText = reply.slice(dayInfo.start, end);
-      // 匹配任务行：-、*、数字.、数字、、•、◦
-      const taskLines = dayText.match(/[-*•◦]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
-      const tasks = [];
-      for (const line of taskLines) {
-        const content = line.replace(/^[-*•◦]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
-        if (content && content.length > 2 && content.length < 200) {
-          let type = 'other';
-          if (/单词|词汇|vocab|word|背/i.test(content)) type = 'vocabulary';
-          else if (/阅读|read|reading|仔细阅读|长篇阅读|篇章/i.test(content)) type = 'reading';
-          else if (/听力|listen|listening|精听|泛听|听写/i.test(content)) type = 'listening';
-          else if (/写作|作文|write|writing|翻译|translation|范文/i.test(content)) type = 'writing';
-          else if (/口语|speak|speaking|跟读|朗读/i.test(content)) type = 'speaking';
-          let duration = 30;
-          const durMatch = content.match(/(\d+)\s*(分钟|min|minute)/i);
-          if (durMatch) duration = parseInt(durMatch[1]);
-          tasks.push({ type: type, content: content, duration: duration });
-        }
-      }
-      // 如果没找到任务行，把整段作为一个任务
-      if (tasks.length === 0) {
-        const cleanText = dayText.replace(/第\s*\d+\s*天[：:]?\s*/i, '').replace(/Day\s*\d+[：:]?\s*/i, '').trim();
-        if (cleanText.length > 5 && cleanText.length < 200) {
-          tasks.push({ type: 'other', content: cleanText, duration: 30 });
-        }
-      }
-      if (tasks.length > 0) plan.push({ day: dayInfo.day, tasks: tasks });
     }
     if (plan.length > 0) data = { plan: plan };
   }
