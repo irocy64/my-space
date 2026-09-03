@@ -6852,35 +6852,43 @@ async function sendAiMessage(text) {
     const decoder = new TextDecoder();
     let fullContent = '';
     let thinkingContent = '';
+    let buffer = '';
+    let streamDone = false;
     const bubble = document.getElementById('aiStreamContent');
     bubble.innerHTML = '';
 
-    while (true) {
+    function updateBubble() {
+      const thinkingHtml = thinkingContent ? '<div style="color:var(--text-light);font-size:12px;border-left:2px solid var(--primary);padding-left:8px;margin-bottom:8px;">💭 思考过程<br>' + escapeHtml(thinkingContent) + '</div>' : '';
+      bubble.innerHTML = thinkingHtml + escapeHtml(fullContent);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    while (!streamDone) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\\n');
+      buffer += decoder.decode(value, { stream: true });
+      // 按行分割，保留不完整的行在缓冲区
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          if (data === '[DONE]') continue;
-          try {
-            const json = JSON.parse(data);
-            const delta = json.choices?.[0]?.delta;
-            if (delta) {
-              if (delta.reasoning_content) {
-                thinkingContent += delta.reasoning_content;
-                bubble.innerHTML = '<div style="color:var(--text-light);font-size:12px;border-left:2px solid var(--primary);padding-left:8px;margin-bottom:8px;">💭 思考中...<br>' + escapeHtml(thinkingContent) + '</div>' + escapeHtml(fullContent);
-              }
-              if (delta.content) {
-                fullContent += delta.content;
-                const thinkingHtml = thinkingContent ? '<div style="color:var(--text-light);font-size:12px;border-left:2px solid var(--primary);padding-left:8px;margin-bottom:8px;">💭 思考过程<br>' + escapeHtml(thinkingContent) + '</div>' : '';
-                bubble.innerHTML = thinkingHtml + escapeHtml(fullContent);
-              }
-              container.scrollTop = container.scrollHeight;
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') { streamDone = true; break; }
+        try {
+          const json = JSON.parse(data);
+          const delta = json.choices?.[0]?.delta;
+          if (delta) {
+            if (delta.reasoning_content) {
+              thinkingContent += delta.reasoning_content;
+              updateBubble();
             }
-          } catch(e) {}
-        }
+            if (delta.content) {
+              fullContent += delta.content;
+              updateBubble();
+            }
+          }
+        } catch(e) {}
       }
     }
 
@@ -6889,6 +6897,8 @@ async function sendAiMessage(text) {
       aiConversation.push({ role: 'assistant', content: fullContent });
       saveAiHistory();
       addSaveButtonsToMessage(msgDiv, fullContent);
+    } else if (!thinkingContent) {
+      bubble.innerHTML = '<span style="color:var(--text-light);">（无回复内容）</span>';
     }
   } catch(err) {
     const bubble = document.getElementById('aiStreamContent');
