@@ -4515,6 +4515,7 @@ JSON格式如下：
     const totalTasks = await saveEnglishPlanToDB(data);
     showToast('已生成 ' + totalTasks + ' 个学习任务，覆盖 ' + data.plan.length + ' 天', 'success');
     renderEnglish();
+    setTimeout(function() { navigateTo('english'); }, 800);
   } catch(err) {
     console.error('AI计划生成失败', err);
     showToast('生成失败：' + err.message, 'error');
@@ -5378,6 +5379,14 @@ function renderWorkouts() {
       '<div class="workout-stat-card"><div class="num" id="workoutWeekCount">0</div><div class="label">本周训练次数</div></div>' +
       '<div class="workout-stat-card"><div class="num" id="workoutPRCount">0</div><div class="label">个人纪录(PR)</div></div>' +
     '</div>' +
+    '<div class="card" id="workoutAiCard" style="padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(255,152,0,0.08),transparent);border-color:rgba(255,152,0,0.3);">' +
+      '<span style="font-size:24px;">💪</span>' +
+      '<div style="flex:1;">' +
+        '<div style="font-size:14px;font-weight:600;color:var(--text);">AI 智能训练计划</div>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">告诉 AI 你的目标，自动生成每日训练安排</div>' +
+      '</div>' +
+      '<button class="btn-primary" id="workoutAiBtn" style="white-space:nowrap;">生成计划</button>' +
+    '</div>' +
     '<div class="workout-week-calendar" id="workoutCalendar"></div>' +
     '<div id="workoutDetail"></div>';
 
@@ -5385,8 +5394,172 @@ function renderWorkouts() {
   loadWorkoutDetail();
   loadWorkoutStats();
 
+  const workoutAiBtn = document.getElementById('workoutAiBtn');
+  if (workoutAiBtn) workoutAiBtn.addEventListener('click', showWorkoutAiPlanForm);
+
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.onclick = function() { openWorkoutModal(); };
+}
+
+// ===== 健身 AI 计划 =====
+function showWorkoutAiPlanForm() {
+  openModal({
+    title: '💪 AI 智能训练计划',
+    bodyHTML:
+      '<div class="mm-form-row"><label>训练目标</label>' +
+      '<select id="workoutAiGoal" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="增肌">增肌</option>' +
+        '<option value="减脂">减脂</option>' +
+        '<option value="塑形">塑形</option>' +
+        '<option value="力量提升">力量提升</option>' +
+      '</select></div>' +
+      '<div class="mm-form-row"><label>每周训练天数</label>' +
+      '<select id="workoutAiDays" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="3">3天</option>' +
+        '<option value="4" selected>4天</option>' +
+        '<option value="5">5天</option>' +
+        '<option value="6">6天</option>' +
+      '</select></div>' +
+      '<div class="mm-form-row"><label>计划周期（周）</label>' +
+      '<select id="workoutAiWeeks" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="4">4周</option>' +
+        '<option value="8" selected>8周</option>' +
+        '<option value="12">12周</option>' +
+      '</select></div>' +
+      '<div class="mm-form-row"><label>训练水平</label>' +
+      '<select id="workoutAiLevel" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="新手">新手</option>' +
+        '<option value="中级" selected>中级</option>' +
+        '<option value="高级">高级</option>' +
+      '</select></div>',
+    confirmText: '开始生成',
+    onConfirm: function() {
+      const goal = document.getElementById('workoutAiGoal').value;
+      const days = document.getElementById('workoutAiDays').value;
+      const weeks = document.getElementById('workoutAiWeeks').value;
+      const level = document.getElementById('workoutAiLevel').value;
+      generateWorkoutAiPlan(goal, days, weeks, level);
+      return true;
+    }
+  });
+}
+
+// 从AI回复解析健身计划
+function parseWorkoutPlanFromText(reply) {
+  let data = null;
+  // 方法1：直接解析JSON
+  try {
+    const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+    if (cleaned.startsWith('{')) data = JSON.parse(cleaned);
+  } catch(e) {}
+  // 方法2：正则提取JSON
+  if (!data) {
+    const jsonMatch = reply.match(/\{[\s\S]*?"plan"[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        let jsonStr = jsonMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
+        data = JSON.parse(jsonStr);
+      } catch(e) {}
+    }
+  }
+  // 方法3：从markdown按天提取
+  if (!data || !data.plan) {
+    const plan = [];
+    const dayRegex = /(?:第\s*(\d+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
+    let match;
+    const dayPositions = [];
+    while ((match = dayRegex.exec(reply)) !== null) {
+      const dayNum = parseInt(match[1] || match[2] || match[3]);
+      dayPositions.push({ day: dayNum, start: match.index });
+    }
+    for (let i = 0; i < dayPositions.length; i++) {
+      const dayInfo = dayPositions[i];
+      const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : reply.length;
+      const dayText = reply.slice(dayInfo.start, end);
+      // 提取训练部位
+      let muscleGroup = '';
+      const muscleMatch = dayText.match(/(胸|背|腿|肩|手臂|核心|有氧|休息|全身|推拉腿|推|拉)/);
+      if (muscleMatch) muscleGroup = muscleMatch[1];
+      // 提取动作
+      const exerciseLines = dayText.match(/[-*]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
+      const exercises = [];
+      for (const line of exerciseLines) {
+        const name = line.replace(/^[-*]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
+        if (name && name.length > 1 && name.length < 50) {
+          exercises.push({ name: name, weight: null, sets: 3, reps: '12', notes: '' });
+        }
+      }
+      if (muscleGroup || exercises.length > 0) {
+        plan.push({ day: dayInfo.day, muscleGroup: muscleGroup || '综合训练', duration: 60, exercises: exercises, notes: '' });
+      }
+    }
+    if (plan.length > 0) data = { plan: plan };
+  }
+  return data;
+}
+
+// 保存健身计划到数据库
+async function saveWorkoutPlanToDB(data) {
+  const today = new Date();
+  let total = 0;
+  for (const dayPlan of data.plan) {
+    const dayOffset = dayPlan.day - 1;
+    const date = new Date(today);
+    date.setDate(today.getDate() + dayOffset);
+    const dateStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+    await dbAdd('workouts', {
+      id: genId(),
+      date: dateStr,
+      muscleGroup: dayPlan.muscleGroup || '综合训练',
+      duration: dayPlan.duration || 60,
+      exercises: dayPlan.exercises || [],
+      notes: dayPlan.notes || '',
+      createdAt: Date.now(),
+      aiGenerated: true
+    });
+    total++;
+  }
+  return total;
+}
+
+async function generateWorkoutAiPlan(goal, days, weeks, level) {
+  if (!aiApiKey) { showToast('请先在设置中配置 API Key', 'error'); return; }
+  showToast('AI 正在生成训练计划...', 'info');
+  const totalDays = parseInt(days) * parseInt(weeks);
+  const prompt = `你是一个专业健身教练。请为用户制定一份健身训练计划。
+训练目标：${goal}
+每周训练：${days}天
+计划周期：${weeks}周（共${totalDays}次训练）
+训练水平：${level}
+
+【重要】你的回复必须是纯JSON对象，不能包含任何其他文字、解释或markdown标记。直接以{开头，以}结尾。
+
+JSON格式：
+{"plan":[{"day":1,"muscleGroup":"胸部","duration":60,"exercises":[{"name":"杠铃卧推","sets":4,"reps":"8-10","notes":""}]},{"day":2,"muscleGroup":"背部","duration":60,"exercises":[...]}]}
+
+规则：
+1. day从1开始，连续编号，共${totalDays}天
+2. muscleGroup是训练部位（胸/背/腿/肩/手臂/核心/有氧/休息）
+3. duration单位分钟
+4. exercises是动作数组，每个动作有name、sets、reps
+5. 只返回JSON，不要任何其他内容`;
+
+  try {
+    const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
+    const data = parseWorkoutPlanFromText(reply);
+    if (!data || !data.plan || data.plan.length === 0) {
+      showToast('AI返回格式无法解析，请重试', 'error');
+      console.log('AI原始回复:', reply);
+      return;
+    }
+    const total = await saveWorkoutPlanToDB(data);
+    showToast('已生成 ' + total + ' 次训练安排，覆盖 ' + data.plan.length + ' 天', 'success');
+    renderWorkouts();
+    setTimeout(function() { navigateTo('workouts'); }, 800);
+  } catch(err) {
+    console.error('健身计划生成失败', err);
+    showToast('生成失败：' + err.message, 'error');
+  }
 }
 
 function loadWorkoutCalendar() {
@@ -6135,6 +6308,14 @@ function renderBooks() {
       '<div class="books-tab" data-status="finished">✅ 已读完</div>' +
       '<div class="books-tab" data-status="want">📋 想读</div>' +
     '</div>' +
+    '<div class="card" id="bookAiCard" style="padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(156,39,176,0.08),transparent);border-color:rgba(156,39,176,0.3);">' +
+      '<span style="font-size:24px;">📚</span>' +
+      '<div style="flex:1;">' +
+        '<div style="font-size:14px;font-weight:600;color:var(--text);">AI 智能阅读计划</div>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">输入书名，AI 帮你制定每日阅读计划</div>' +
+      '</div>' +
+      '<button class="btn-primary" id="bookAiBtn" style="white-space:nowrap;">生成计划</button>' +
+    '</div>' +
     '<div id="booksShelfView"></div>' +
     '<div class="book-detail-view" id="booksDetailView"></div>';
 
@@ -6152,6 +6333,9 @@ function renderBooks() {
   });
 
   showBooksShelf();
+
+  const bookAiBtn = document.getElementById('bookAiBtn');
+  if (bookAiBtn) bookAiBtn.addEventListener('click', showBookAiPlanForm);
 
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.onclick = function() { openAddBookModal(); };
@@ -6196,6 +6380,172 @@ function showBooksShelf() {
       });
     });
   });
+}
+
+// ===== 读书 AI 计划 =====
+function showBookAiPlanForm() {
+  openModal({
+    title: '📚 AI 智能阅读计划',
+    bodyHTML:
+      '<div class="mm-form-row"><label>书名</label>' +
+      '<input type="text" id="bookAiTitle" placeholder="例如：人类简史" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;"></div>' +
+      '<div class="mm-form-row"><label>作者（可选）</label>' +
+      '<input type="text" id="bookAiAuthor" placeholder="例如：尤瓦尔·赫拉利" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;"></div>' +
+      '<div class="mm-form-row"><label>计划天数</label>' +
+      '<select id="bookAiDays" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="7">7天</option>' +
+        '<option value="14">14天</option>' +
+        '<option value="30" selected>30天</option>' +
+        '<option value="60">60天</option>' +
+      '</select></div>' +
+      '<div class="mm-form-row"><label>每天阅读时间</label>' +
+      '<select id="bookAiTime" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="15">15分钟</option>' +
+        '<option value="30" selected>30分钟</option>' +
+        '<option value="45">45分钟</option>' +
+        '<option value="60">60分钟</option>' +
+      '</select></div>',
+    confirmText: '开始生成',
+    onConfirm: function() {
+      const title = document.getElementById('bookAiTitle').value.trim();
+      if (!title) { showToast('请输入书名', 'error'); return false; }
+      const author = document.getElementById('bookAiAuthor').value.trim();
+      const days = document.getElementById('bookAiDays').value;
+      const time = document.getElementById('bookAiTime').value;
+      generateBookAiPlan(title, author, days, time);
+      return true;
+    }
+  });
+}
+
+// 从AI回复解析阅读计划
+function parseBookPlanFromText(reply) {
+  let data = null;
+  try {
+    const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+    if (cleaned.startsWith('{')) data = JSON.parse(cleaned);
+  } catch(e) {}
+  if (!data) {
+    const jsonMatch = reply.match(/\{[\s\S]*?"plan"[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        let jsonStr = jsonMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
+        data = JSON.parse(jsonStr);
+      } catch(e) {}
+    }
+  }
+  // 从markdown按天提取
+  if (!data || !data.plan) {
+    const plan = [];
+    const dayRegex = /(?:第\s*(\d+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
+    let match;
+    const dayPositions = [];
+    while ((match = dayRegex.exec(reply)) !== null) {
+      const dayNum = parseInt(match[1] || match[2] || match[3]);
+      dayPositions.push({ day: dayNum, start: match.index });
+    }
+    for (let i = 0; i < dayPositions.length; i++) {
+      const dayInfo = dayPositions[i];
+      const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : reply.length;
+      const dayText = reply.slice(dayInfo.start, end);
+      // 提取阅读内容
+      const contentMatch = dayText.match(/[:：]\s*(.+?)(?:\n|$)/);
+      let content = contentMatch ? contentMatch[1].trim() : dayText.replace(/第\s*\d+\s*天[：:]?\s*/, '').trim().slice(0, 100);
+      if (content && content.length > 2) {
+        plan.push({ day: dayInfo.day, content: content });
+      }
+    }
+    if (plan.length > 0) data = { plan: plan };
+  }
+  return data;
+}
+
+// 保存阅读计划到数据库（创建自定义模块"阅读计划"）
+async function saveBookPlanToDB(data, bookTitle, bookAuthor) {
+  // 1. 创建书的记录
+  const bookId = genId();
+  await dbAdd('books', {
+    id: bookId,
+    title: bookTitle,
+    author: bookAuthor || '未知作者',
+    status: 'reading',
+    progress: 0,
+    totalPages: null,
+    currentPage: null,
+    rating: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    aiGenerated: true
+  });
+
+  // 2. 获取或创建"阅读计划"自定义模块
+  let moduleConfig = await dbGet('settings', 'moduleConfig');
+  if (!moduleConfig) moduleConfig = { hiddenModules: [], customModules: [] };
+  let readingModule = moduleConfig.customModules.find(function(m) { return m.name === '阅读计划'; });
+  if (!readingModule) {
+    readingModule = { id: 'reading-plan-' + genId(), name: '阅读计划', icon: '📖', color: '#9c27b0', createdAt: Date.now() };
+    moduleConfig.customModules.push(readingModule);
+    await dbPut('settings', moduleConfig);
+  }
+
+  // 3. 按天保存阅读任务
+  const today = new Date();
+  let total = 0;
+  for (const dayPlan of data.plan) {
+    const dayOffset = dayPlan.day - 1;
+    const date = new Date(today);
+    date.setDate(today.getDate() + dayOffset);
+    const dateStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+    await dbAdd('customItems', {
+      id: genId(),
+      moduleId: readingModule.id,
+      title: '第' + dayPlan.day + '天：' + (dayPlan.content || '阅读任务'),
+      content: dayPlan.content || '',
+      date: dateStr,
+      createdAt: Date.now(),
+      aiGenerated: true,
+      bookId: bookId
+    });
+    total++;
+  }
+  return { total: total, moduleId: readingModule.id };
+}
+
+async function generateBookAiPlan(title, author, days, time) {
+  if (!aiApiKey) { showToast('请先在设置中配置 API Key', 'error'); return; }
+  showToast('AI 正在生成阅读计划...', 'info');
+  const prompt = `你是一个阅读规划专家。请为用户制定一份《${title}》的阅读计划。
+${author ? '作者：' + author : ''}
+计划天数：${days}天
+每天阅读时间：${time}分钟
+
+【重要】你的回复必须是纯JSON对象，不能包含任何其他文字、解释或markdown标记。直接以{开头，以}结尾。
+
+JSON格式：
+{"plan":[{"day":1,"content":"阅读第1-3章，了解...背景"},{"day":2,"content":"阅读第4-5章，重点理解..."}]}
+
+规则：
+1. day从1开始，连续编号，共${days}天
+2. content是当天的阅读内容和重点提示，简洁明了
+3. 只返回JSON，不要任何其他内容`;
+
+  try {
+    const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
+    const data = parseBookPlanFromText(reply);
+    if (!data || !data.plan || data.plan.length === 0) {
+      showToast('AI返回格式无法解析，请重试', 'error');
+      console.log('AI原始回复:', reply);
+      return;
+    }
+    const result = await saveBookPlanToDB(data, title, author);
+    showToast('已生成 ' + result.total + ' 天阅读计划，已创建「阅读计划」模块', 'success');
+    renderBooks();
+    if (typeof renderSidebar === 'function') renderSidebar();
+    setTimeout(function() { navigateTo('books'); }, 800);
+  } catch(err) {
+    console.error('阅读计划生成失败', err);
+    showToast('生成失败：' + err.message, 'error');
+  }
 }
 
 function openBookDetail(bookId) {
@@ -7040,31 +7390,46 @@ async function saveAiToModule(module, content) {
         showToast('已保存到英语学习模块', 'success');
       }
     } else if (module === 'books') {
-      // 存到读书
-      await dbAdd('books', {
-        id: genId(),
-        title: title,
-        author: 'AI生成',
-        status: 'reading',
-        rating: 0,
-        notes: content,
-        createdAt: Date.now(),
-        aiGenerated: true
-      });
-      showToast('已保存到读书模块', 'success');
+      // 尝试解析为阅读计划
+      const planData = parseBookPlanFromText(content);
+      if (planData && planData.plan && planData.plan.length > 0) {
+        const result = await saveBookPlanToDB(planData, 'AI生成书单', '');
+        showToast('已解析并保存 ' + result.total + ' 天阅读计划', 'success');
+        if (typeof renderSidebar === 'function') renderSidebar();
+      } else {
+        // 不是计划格式，存为一本书
+        await dbAdd('books', {
+          id: genId(),
+          title: title,
+          author: 'AI生成',
+          status: 'reading',
+          rating: 0,
+          notes: content,
+          createdAt: Date.now(),
+          aiGenerated: true
+        });
+        showToast('已保存到读书模块', 'success');
+      }
     } else if (module === 'workouts') {
-      // 存到健身
-      await dbAdd('workouts', {
-        id: genId(),
-        date: todayStr(),
-        type: 'AI计划',
-        duration: 0,
-        exercises: [],
-        notes: content,
-        createdAt: Date.now(),
-        aiGenerated: true
-      });
-      showToast('已保存到健身模块', 'success');
+      // 尝试解析为结构化训练计划
+      const planData = parseWorkoutPlanFromText(content);
+      if (planData && planData.plan && planData.plan.length > 0) {
+        const total = await saveWorkoutPlanToDB(planData);
+        showToast('已解析并保存 ' + total + ' 次训练到健身模块', 'success');
+      } else {
+        // 不是计划格式，存为一条训练记录
+        await dbAdd('workouts', {
+          id: genId(),
+          date: todayStr(),
+          muscleGroup: 'AI生成',
+          duration: 0,
+          exercises: [],
+          notes: content,
+          createdAt: Date.now(),
+          aiGenerated: true
+        });
+        showToast('已保存到健身模块', 'success');
+      }
     } else if (module === 'media') {
       // 存到自媒体
       await dbAdd('media', {
