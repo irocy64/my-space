@@ -5480,12 +5480,36 @@ function renderWorkouts() {
       '</div>' +
       '<button class="btn-primary" id="workoutAiBtn" style="white-space:nowrap;">生成计划</button>' +
     '</div>' +
+    '<div class="week-nav" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+      '<button class="btn-secondary" id="workoutPrevWeek" style="padding:4px 12px;font-size:12px;">← 上周</button>' +
+      '<span id="workoutWeekLabel" style="font-size:13px;color:var(--text-light);">本周</span>' +
+      '<button class="btn-secondary" id="workoutNextWeek" style="padding:4px 12px;font-size:12px;">下周 →</button>' +
+    '</div>' +
     '<div class="workout-week-calendar" id="workoutCalendar"></div>' +
     '<div id="workoutDetail"></div>';
 
   loadWorkoutCalendar();
   loadWorkoutDetail();
   loadWorkoutStats();
+
+  // 周翻页
+  if (window._workoutWeekOffset === undefined) window._workoutWeekOffset = 0;
+  const wLabel = document.getElementById('workoutWeekLabel');
+  if (wLabel) {
+    if (window._workoutWeekOffset === 0) wLabel.textContent = '本周';
+    else if (window._workoutWeekOffset > 0) wLabel.textContent = '第' + (window._workoutWeekOffset + 1) + '周后';
+    else wLabel.textContent = '第' + (-window._workoutWeekOffset) + '周前';
+  }
+  const wPrev = document.getElementById('workoutPrevWeek');
+  if (wPrev) wPrev.addEventListener('click', function() {
+    window._workoutWeekOffset--;
+    renderWorkouts();
+  });
+  const wNext = document.getElementById('workoutNextWeek');
+  if (wNext) wNext.addEventListener('click', function() {
+    window._workoutWeekOffset++;
+    renderWorkouts();
+  });
 
   const workoutAiBtn = document.getElementById('workoutAiBtn');
   if (workoutAiBtn) workoutAiBtn.addEventListener('click', showWorkoutAiPlanForm);
@@ -5644,7 +5668,7 @@ JSON格式：
 }
 
 function loadWorkoutCalendar() {
-  const weekDates = getWeekDates();
+  const weekDates = getWeekDates(window._workoutWeekOffset || 0);
   const dayNames = ['一','二','三','四','五','六','日'];
   const selected = window._workoutSelectedDate;
   dbGetAll('workouts').then(function(workouts) {
