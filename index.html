@@ -4422,12 +4422,39 @@ async function generateEnglishAiPlan(goal, days, hours) {
 
   try {
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
-    // 解析JSON
-    let jsonStr = reply.trim();
-    // 去除可能的markdown代码块标记
-    jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-    const data = JSON.parse(jsonStr);
-    if (!data.plan || !Array.isArray(data.plan)) throw new Error('返回格式不正确');
+    // 从回复中提取JSON（更健壮的方式）
+    let data = null;
+    // 先尝试直接解析
+    try {
+      const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+      data = JSON.parse(cleaned);
+    } catch(e1) {
+      // 尝试用正则提取第一个JSON对象
+      const jsonMatch = reply.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          // 处理JSON中的换行符
+          let jsonStr = jsonMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
+          data = JSON.parse(jsonStr);
+        } catch(e2) {
+          // 再尝试提取plan数组
+          const planMatch = reply.match(/\[[\s\S]*\]/);
+          if (planMatch) {
+            try {
+              let planStr = planMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
+              const plan = JSON.parse(planStr);
+              data = { plan: plan };
+            } catch(e3) {}
+          }
+        }
+      }
+    }
+
+    if (!data || !data.plan || !Array.isArray(data.plan)) {
+      showToast('AI返回格式不正确，原始回复已显示在控制台', 'error');
+      console.log('AI原始回复:', reply);
+      return;
+    }
 
     // 批量创建任务
     const today = new Date();
@@ -6812,11 +6839,19 @@ async function sendAiMessage(text) {
   document.getElementById('aiInput').value = '';
   document.getElementById('aiSendBtn').disabled = true;
 
-  // 创建AI消息容器（流式更新）
+  // 移除旧的loading指示器
+  const oldTyping = document.getElementById('aiTypingIndicator');
+  if (oldTyping) oldTyping.remove();
+
+  // 创建AI消息容器（流式更新）- 不用固定ID，用变量引用
   const container = document.getElementById('aiMessages');
   const msgDiv = document.createElement('div');
   msgDiv.className = 'ai-msg assistant';
-  msgDiv.innerHTML = '<div class="msg-avatar">🤖</div><div class="msg-bubble" id="aiStreamContent"><div class="ai-typing"><span></span><span></span><span></span></div></div>';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
+  msgDiv.innerHTML = '<div class="msg-avatar">🤖</div>';
+  msgDiv.appendChild(bubble);
   container.appendChild(msgDiv);
   container.scrollTop = container.scrollHeight;
 
@@ -6854,7 +6889,6 @@ async function sendAiMessage(text) {
     let thinkingContent = '';
     let buffer = '';
     let streamDone = false;
-    const bubble = document.getElementById('aiStreamContent');
     bubble.innerHTML = '';
 
     function updateBubble() {
@@ -6922,8 +6956,7 @@ async function sendAiMessage(text) {
       bubble.innerHTML = '<span style="color:var(--text-light);">（无回复内容）</span>';
     }
   } catch(err) {
-    const bubble = document.getElementById('aiStreamContent');
-    if (bubble) bubble.innerHTML = '出错了：' + err.message + '\\n\\n请检查 API Key 是否正确，或网络是否可访问火山引擎。';
+    if (bubble) bubble.innerHTML = '出错了：' + err.message + '\n\n请检查 API Key 是否正确，或网络是否可访问火山引擎。';
   }
   document.getElementById('aiSendBtn').disabled = false;
 }
