@@ -2207,6 +2207,87 @@ body::before {
 .custom-item .ci-actions button { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text-light); font-size: 12px; cursor: pointer; }
 .custom-item .ci-actions button:hover { border-color: var(--primary); color: var(--primary); }
 .custom-item .ci-actions button.danger:hover { border-color: #ff6b6b; color: #ff6b6b; }
+/* ===== AI 助手 ===== */
+.ai-assistant-btn {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; box-shadow: 0 4px 20px rgba(79,195,247,0.4);
+  transition: all 0.3s;
+}
+.ai-assistant-btn:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(79,195,247,0.6); }
+.ai-assistant-btn .ai-badge {
+  position: absolute; top: -2px; right: -2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #ff5252; color: #fff; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+}
+.ai-modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6); z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.ai-modal-overlay.show { display: flex; }
+.ai-modal {
+  width: 90%; max-width: 720px; height: 80vh; max-height: 700px;
+  background: var(--card); border-radius: 16px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.ai-modal-header {
+  padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(79,195,247,0.1), transparent);
+}
+.ai-modal-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; color: var(--text); }
+.ai-modal-title .ai-icon { font-size: 22px; }
+.ai-modal-close { background: none; border: none; color: var(--text-light); font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.ai-modal-close:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+.ai-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.ai-msg { display: flex; gap: 10px; max-width: 85%; }
+.ai-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.ai-msg .msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.ai-msg.assistant .msg-avatar { background: linear-gradient(135deg, #4fc3f7, #29b6f6); }
+.ai-msg.user .msg-avatar { background: var(--purple); }
+.ai-msg .msg-bubble { padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.7; word-break: break-word; white-space: pre-wrap; }
+.ai-msg.assistant .msg-bubble { background: rgba(255,255,255,0.06); color: var(--text); border-top-left-radius: 4px; }
+.ai-msg.user .msg-bubble { background: var(--primary); color: #0a0e1a; border-top-right-radius: 4px; font-weight: 500; }
+.ai-msg .msg-bubble code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+.ai-typing { display: flex; gap: 4px; padding: 10px 14px; }
+.ai-typing span { width: 8px; height: 8px; border-radius: 50%; background: var(--text-light); animation: typing 1.4s infinite; }
+.ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
+.ai-input-area { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: flex-end; }
+.ai-input-area textarea {
+  flex: 1; padding: 10px 14px; border-radius: 10px;
+  border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+  color: var(--text); font-size: 14px; resize: none;
+  max-height: 100px; min-height: 40px; font-family: inherit;
+}
+.ai-input-area textarea:focus { outline: none; border-color: var(--primary); }
+.ai-send-btn {
+  padding: 10px 20px; border-radius: 10px; border: none;
+  background: var(--primary); color: #0a0e1a; font-weight: 700;
+  cursor: pointer; font-size: 14px; transition: all 0.2s;
+}
+.ai-send-btn:hover { background: #29b6f6; }
+.ai-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-quick-actions { display: flex; gap: 8px; padding: 0 20px 10px; flex-wrap: wrap; }
+.ai-quick-btn {
+  padding: 6px 12px; border-radius: 16px; border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03); color: var(--text-light);
+  font-size: 12px; cursor: pointer; transition: all 0.2s;
+}
+.ai-quick-btn:hover { border-color: var(--primary); color: var(--primary); }
+.ai-settings-row { display: flex; gap: 10px; align-items: center; padding: 10px 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-light); }
+.ai-settings-row input { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--text); font-size: 12px; }
+.ai-settings-row button { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--primary); background: none; color: var(--primary); font-size: 12px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -3653,6 +3734,14 @@ function renderMediaIdeas() {
           return '<button class="media-filter-btn ' + (filter === k ? 'active' : '') + '" data-filter="' + k + '">' + MEDIA_STATUS[k].label + '</button>';
         }).join('') +
       '</div>' +
+      '<div class="card" id="mediaAiCard" style="padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(79,195,247,0.08),transparent);border-color:rgba(79,195,247,0.3);">' +
+        '<span style="font-size:24px;">✨</span>' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:14px;font-weight:600;color:var(--text);">AI 智能创作</div>' +
+          '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">输入灵感，AI 帮你生成标题、文案、视频脚本</div>' +
+        '</div>' +
+        '<button class="btn-primary" id="mediaAiBtn" style="white-space:nowrap;">开始创作</button>' +
+      '</div>' +
       (filtered.length === 0 ? '<div class="empty-state"><div class="icon">💡</div>还没有视频灵感</div>' :
       '<div class="media-grid">' + filtered.map(function(m) {
         const st = MEDIA_STATUS[m.status] || MEDIA_STATUS.idea;
@@ -3680,6 +3769,9 @@ function renderMediaIdeas() {
         });
       });
     });
+
+    const aiBtn = document.getElementById('mediaAiBtn');
+    if (aiBtn) aiBtn.addEventListener('click', showMediaAiForm);
   });
 }
 
@@ -3877,6 +3969,97 @@ function refreshMediaCurrentTab() {
   if (tab === 'calendar') renderMediaCalendar();
   if (tab === 'data') renderMediaData();
 }
+
+// ===== 自媒体 AI 创作 =====
+function showMediaAiForm() {
+  openModal({
+    title: '✨ AI 智能创作',
+    bodyHTML:
+      '<div class="mm-form-row"><label>灵感/主题</label>' +
+      '<input type="text" id="mediaAiTopic" placeholder="例如：五条悟主题的手机壳开箱测评"></div>' +
+      '<div class="mm-form-row"><label>内容类型</label>' +
+      '<select id="mediaAiType" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="video_script">短视频脚本（含分镜）</option>' +
+        '<option value="article">图文文案</option>' +
+        '<option value="titles">爆款标题（5个）</option>' +
+        '<option value="outline">视频大纲+要点</option>' +
+      '</select></div>' +
+      '<div class="mm-form-row"><label>目标平台</label>' +
+      '<select id="mediaAiPlatform" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="抖音">抖音</option>' +
+        '<option value="B站">B站</option>' +
+        '<option value="视频号">视频号</option>' +
+        '<option value="小红书">小红书</option>' +
+      '</select></div>',
+    confirmText: '开始生成',
+    onConfirm: function() {
+      const topic = document.getElementById('mediaAiTopic').value.trim();
+      if (!topic) { showToast('请输入灵感/主题', 'error'); return false; }
+      const type = document.getElementById('mediaAiType').value;
+      const platform = document.getElementById('mediaAiPlatform').value;
+      generateMediaContent(topic, type, platform);
+      return true;
+    }
+  });
+}
+
+async function generateMediaContent(topic, type, platform) {
+  if (!aiApiKey) {
+    showToast('请先在 AI 助手中配置 API Key', 'error');
+    return;
+  }
+  showToast('AI 正在创作中...', 'info');
+  const typeLabels = {
+    video_script: '短视频脚本（含分镜、台词、时长）',
+    article: '图文文案（含标题、正文、话题标签）',
+    titles: '5个爆款标题',
+    outline: '视频大纲+核心要点'
+  };
+  const prompt = `你是一个资深自媒体内容创作者。请根据以下信息创作内容：
+主题：${topic}
+内容类型：${typeLabels[type]}
+目标平台：${platform}
+
+请直接输出创作内容，不要有多余的解释。内容要吸引人、有网感、适合${platform}平台的风格。`;
+
+  try {
+    const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
+    // 显示生成结果，让用户确认并保存
+    setTimeout(function() {
+      openModal({
+        title: '✨ AI 创作结果',
+        bodyHTML:
+          '<div style="max-height:400px;overflow-y:auto;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--text);" id="mediaAiResult">' + escapeHtml(reply) + '</div>' +
+          '<div style="margin-top:12px;font-size:12px;color:var(--text-light);">确认后将保存到灵感库，状态为「构思中」</div>',
+        confirmText: '保存到灵感库',
+        onConfirm: function() {
+          const title = topic + '（AI创作）';
+          dbAdd('media', {
+            id: genId(),
+            title: title,
+            status: 'planning',
+            publishDate: null,
+            platform: platform,
+            idea: reply,
+            notes: 'AI生成，类型：' + typeLabels[type],
+            views: null,
+            likes: null,
+            comments: null,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            aiGenerated: true
+          }).then(function() {
+            refreshMediaCurrentTab();
+            showToast('已保存到灵感库', 'success');
+          });
+          return true;
+        }
+      });
+    }, 100);
+  } catch(err) {
+    showToast('创作失败：' + err.message, 'error');
+  }
+}
 function renderEnglish() {
   const container = document.getElementById('page-english');
   const selectedDate = window._englishSelectedDate || todayStr();
@@ -3893,6 +4076,14 @@ function renderEnglish() {
       '<div class="english-stat-card"><div class="num" id="engStreak">0</div><div class="label">连续学习天数 🔥</div></div>' +
       '<div class="english-stat-card"><div class="num" id="engWeekRate">0%</div><div class="label">本周完成率</div></div>' +
       '<div class="english-stat-card"><div class="num" id="engWeekTotal">0</div><div class="label">本周任务数</div></div>' +
+    '</div>' +
+    '<div class="card" style="padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(79,195,247,0.08),transparent);border-color:rgba(79,195,247,0.3);">' +
+      '<span style="font-size:24px;">✨</span>' +
+      '<div style="flex:1;">' +
+        '<div style="font-size:14px;font-weight:600;color:var(--text);">AI 智能学习计划</div>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-top:2px;">告诉 AI 你的目标，自动生成每日学习任务</div>' +
+      '</div>' +
+      '<button class="btn-primary" id="engAiPlanBtn" style="white-space:nowrap;">生成计划</button>' +
     '</div>' +
     '<div class="week-calendar" id="engWeekCalendar"></div>' +
     '<div class="english-day-header">' +
@@ -3918,6 +4109,8 @@ function renderEnglish() {
   document.getElementById('engContentInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') addEnglishTask();
   });
+  // AI 生成计划
+  document.getElementById('engAiPlanBtn').addEventListener('click', showEnglishAiPlanForm);
 
   renderEnglishWeekCalendar();
   loadEnglishDayTasks();
@@ -4174,6 +4367,96 @@ function toggleEnglishTask(id, completed) {
     loadEnglishDayTasks();
     loadEnglishStats();
   });
+}
+
+// ===== AI 生成英语学习计划 =====
+function showEnglishAiPlanForm() {
+  openModal({
+    title: '✨ AI 生成学习计划',
+    bodyHTML:
+      '<div class="mm-form-row"><label>学习目标</label>' +
+      '<select id="aiGoalSelect" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;">' +
+        '<option value="英语六级">英语六级 (CET-6)</option>' +
+        '<option value="英语四级">英语四级 (CET-4)</option>' +
+        '<option value="考研英语">考研英语</option>' +
+        '<option value="雅思">雅思 (IELTS)</option>' +
+        '<option value="托福">托福 (TOEFL)</option>' +
+        '<option value="日常英语提升">日常英语提升</option>' +
+      '</select></div>' +
+      '<div class="mm-form-row"><label>备考天数</label>' +
+      '<input type="number" id="aiDaysInput" value="30" min="1" max="365" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;"></div>' +
+      '<div class="mm-form-row"><label>每天学习(小时)</label>' +
+      '<input type="number" id="aiHoursInput" value="2" min="0.5" max="12" step="0.5" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:14px;"></div>' +
+      '<div style="font-size:12px;color:var(--text-light);margin-top:8px;">AI 将根据你的目标和时间，自动生成每天的单词、阅读、听力、写作任务，从今天开始按日期存入学习计划。</div>',
+    confirmText: '开始生成',
+    onConfirm: function() {
+      const goal = document.getElementById('aiGoalSelect').value;
+      const days = parseInt(document.getElementById('aiDaysInput').value) || 30;
+      const hours = parseFloat(document.getElementById('aiHoursInput').value) || 2;
+      generateEnglishAiPlan(goal, days, hours);
+      return true;
+    }
+  });
+}
+
+async function generateEnglishAiPlan(goal, days, hours) {
+  if (!aiApiKey) {
+    showToast('请先在 AI 助手中配置 API Key', 'error');
+    return;
+  }
+  showToast('AI 正在生成学习计划...', 'info');
+  const prompt = `你是一个英语学习规划专家。请为用户制定一份英语学习计划。
+学习目标：${goal}
+备考天数：${days}天
+每天可学习时间：${hours}小时
+
+请严格按以下JSON格式返回（只返回JSON，不要任何其他文字、解释或markdown标记）：
+{"plan":[{"day":1,"tasks":[{"type":"vocabulary","content":"具体学习内容","duration":30}]},{"day":2,"tasks":[...]}]}
+
+要求：
+1. type只能是：vocabulary(单词), reading(阅读), listening(听力), writing(写作), speaking(口语), other(其他)
+2. duration单位是分钟，每天任务总时长不超过${hours * 60}分钟
+3. 任务内容要具体可执行，比如"背50个六级核心词汇"而不是"背单词"
+4. 前${Math.min(days, 7)}天的任务要详细，后面的可以适当重复但内容要有变化
+5. 要覆盖单词、阅读、听力、写作等多个维度，合理搭配`;
+
+  try {
+    const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
+    // 解析JSON
+    let jsonStr = reply.trim();
+    // 去除可能的markdown代码块标记
+    jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+    const data = JSON.parse(jsonStr);
+    if (!data.plan || !Array.isArray(data.plan)) throw new Error('返回格式不正确');
+
+    // 批量创建任务
+    const today = new Date();
+    let totalTasks = 0;
+    for (const dayPlan of data.plan) {
+      const dayOffset = dayPlan.day - 1;
+      const date = new Date(today);
+      date.setDate(today.getDate() + dayOffset);
+      const dateStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+      for (const task of dayPlan.tasks) {
+        await dbAdd('english', {
+          id: genId(),
+          date: dateStr,
+          type: task.type || 'other',
+          content: task.content || '学习任务',
+          duration: task.duration || 30,
+          completed: false,
+          createdAt: Date.now(),
+          aiGenerated: true
+        });
+        totalTasks++;
+      }
+    }
+    showToast('已生成 ' + totalTasks + ' 个学习任务，覆盖 ' + data.plan.length + ' 天', 'success');
+    renderEnglish();
+  } catch(err) {
+    console.error('AI计划生成失败', err);
+    showToast('生成失败：' + err.message, 'error');
+  }
 }
 
 function deleteEnglishTask(id) {
@@ -6289,6 +6572,150 @@ function initCurseParticles() {
   }
 }
 
+// ===== AI 助手（豆包 API）=====
+let aiApiKey = '';
+let aiConversation = [];
+const AI_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const AI_MODEL = 'doubao-seed-1-6-250615';
+
+async function loadAiKey() {
+  try {
+    const data = await dbTx('settings','readonly',function(s){ return s.get('aiApiKey'); });
+    if (data && data.key) {
+      aiApiKey = data.key;
+      const input = document.getElementById('aiApiKeyInput');
+      if (input) input.value = data.key;
+      const status = document.getElementById('aiKeyStatus');
+      if (status) status.textContent = '已配置';
+    }
+  } catch(e) { console.warn('加载AI Key失败', e); }
+}
+
+async function saveAiKey(key) {
+  aiApiKey = key;
+  await dbPut('settings', { id: 'aiApiKey', key: key });
+  const status = document.getElementById('aiKeyStatus');
+  if (status) { status.textContent = '已保存'; setTimeout(function(){ status.textContent='已配置'; }, 2000); }
+}
+
+function openAiModal() {
+  document.getElementById('aiModalOverlay').classList.add('show');
+  document.getElementById('aiInput').focus();
+  loadAiHistory();
+}
+function closeAiModal() {
+  document.getElementById('aiModalOverlay').classList.remove('show');
+}
+
+function appendAiMessage(role, content) {
+  const container = document.getElementById('aiMessages');
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + role;
+  div.innerHTML = '<div class="msg-avatar">' + (role === 'user' ? '🧑' : '🤖') + '</div>' +
+    '<div class="msg-bubble">' + escapeHtml(content) + '</div>';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function showAiTyping() {
+  const container = document.getElementById('aiMessages');
+  const div = document.createElement('div');
+  div.className = 'ai-msg assistant';
+  div.id = 'aiTypingIndicator';
+  div.innerHTML = '<div class="msg-avatar">🤖</div><div class="msg-bubble"><div class="ai-typing"><span></span><span></span><span></span></div></div>';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+function removeAiTyping() {
+  const el = document.getElementById('aiTypingIndicator');
+  if (el) el.remove();
+}
+
+async function callDoubaoApi(messages) {
+  if (!aiApiKey) throw new Error('请先配置 API Key');
+  const res = await fetch(AI_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + aiApiKey
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 2048
+    })
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error('API 错误 ' + res.status + ': ' + errText.slice(0, 200));
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+async function sendAiMessage(text) {
+  if (!text.trim()) return;
+  if (!aiApiKey) {
+    appendAiMessage('assistant', '请先在下方输入框粘贴你的火山引擎豆包 API Key，点保存后再使用。');
+    return;
+  }
+  appendAiMessage('user', text);
+  aiConversation.push({ role: 'user', content: text });
+  document.getElementById('aiInput').value = '';
+  showAiTyping();
+  document.getElementById('aiSendBtn').disabled = true;
+  try {
+    const reply = await callDoubaoApi(aiConversation);
+    removeAiTyping();
+    appendAiMessage('assistant', reply);
+    aiConversation.push({ role: 'assistant', content: reply });
+    saveAiHistory();
+  } catch(err) {
+    removeAiTyping();
+    appendAiMessage('assistant', '出错了：' + err.message + '\n\n请检查 API Key 是否正确，或网络是否可访问火山引擎。');
+  }
+  document.getElementById('aiSendBtn').disabled = false;
+}
+
+async function saveAiHistory() {
+  await dbPut('settings', { id: 'aiHistory', messages: aiConversation.slice(-20) });
+}
+async function loadAiHistory() {
+  try {
+    const data = await dbTx('settings','readonly',function(s){ return s.get('aiHistory'); });
+    if (data && data.messages && data.messages.length > 0) {
+      aiConversation = data.messages;
+      const container = document.getElementById('aiMessages');
+      container.innerHTML = '';
+      data.messages.forEach(function(m) { appendAiMessage(m.role, m.content); });
+    }
+  } catch(e) {}
+}
+
+function initAiAssistant() {
+  document.getElementById('aiAssistantBtn').addEventListener('click', openAiModal);
+  document.getElementById('aiModalClose').addEventListener('click', closeAiModal);
+  document.getElementById('aiModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeAiModal();
+  });
+  document.getElementById('aiSendBtn').addEventListener('click', function() {
+    sendAiMessage(document.getElementById('aiInput').value);
+  });
+  document.getElementById('aiInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiMessage(this.value); }
+  });
+  document.getElementById('aiSaveKeyBtn').addEventListener('click', function() {
+    const key = document.getElementById('aiApiKeyInput').value.trim();
+    if (key) saveAiKey(key);
+  });
+  document.querySelectorAll('.ai-quick-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { sendAiMessage(btn.dataset.prompt); });
+  });
+  loadAiKey();
+}
+
 // ===== Initialization =====
 function init() {
   // Set date
@@ -6305,6 +6732,7 @@ function init() {
     return loadModuleConfig();
   }).then(function() {
     renderSidebar();
+    initAiAssistant();
     navigateTo('home');
   }).catch(function(err) {
     console.error('DB init failed:', err);
@@ -6479,4 +6907,43 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 })();
 </script>
 </body>
+<!-- AI 助手悬浮按钮 -->
+<button class="ai-assistant-btn" id="aiAssistantBtn" title="AI 助手">🤖</button>
+<!-- AI 对话模态框 -->
+<div class="ai-modal-overlay" id="aiModalOverlay">
+  <div class="ai-modal">
+    <div class="ai-modal-header">
+      <div class="ai-modal-title"><span class="ai-icon">🤖</span>AI 助手 - 豆包</div>
+      <button class="ai-modal-close" id="aiModalClose">×</button>
+    </div>
+    <div class="ai-messages" id="aiMessages">
+      <div class="ai-msg assistant">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble">你好！我是你的 AI 助手。我可以帮你：
+• 生成学习计划（说"帮我做六级备考计划"）
+• 写文案/脚本（说"帮我写一个美食探店文案"）
+• 分析数据、解答问题
+• 生成的内容可以一键保存到对应模块
+
+有什么可以帮你的？</div>
+      </div>
+    </div>
+    <div class="ai-quick-actions">
+      <button class="ai-quick-btn" data-prompt="帮我做一份英语六级备考计划，每天学习2小时，备考30天">📚 六级计划</button>
+      <button class="ai-quick-btn" data-prompt="帮我写一个五条悟主题的自媒体视频脚本，30秒左右">🎬 视频脚本</button>
+      <button class="ai-quick-btn" data-prompt="帮我制定一份一周健身计划，目标增肌，每周练4天">💪 健身计划</button>
+      <button class="ai-quick-btn" data-prompt="今天有什么值得记录的灵感？给我3个自媒体选题">💡 灵感选题</button>
+    </div>
+    <div class="ai-input-area">
+      <textarea id="aiInput" placeholder="输入你的需求，Shift+Enter换行..." rows="1"></textarea>
+      <button class="ai-send-btn" id="aiSendBtn">发送</button>
+    </div>
+    <div class="ai-settings-row">
+      <span>API Key:</span>
+      <input type="password" id="aiApiKeyInput" placeholder="粘贴火山引擎豆包 API Key">
+      <button id="aiSaveKeyBtn">保存</button>
+      <span id="aiKeyStatus" style="color:#4caf50;"></span>
+    </div>
+  </div>
+</div>
 </html>
