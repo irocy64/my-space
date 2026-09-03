@@ -4085,6 +4085,11 @@ function renderEnglish() {
       '</div>' +
       '<button class="btn-primary" id="engAiPlanBtn" style="white-space:nowrap;">生成计划</button>' +
     '</div>' +
+    '<div class="week-nav" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+      '<button class="btn-secondary" id="engPrevWeek" style="padding:4px 12px;font-size:12px;">← 上周</button>' +
+      '<span id="engWeekLabel" style="font-size:13px;color:var(--text-light);">本周</span>' +
+      '<button class="btn-secondary" id="engNextWeek" style="padding:4px 12px;font-size:12px;">下周 →</button>' +
+    '</div>' +
     '<div class="week-calendar" id="engWeekCalendar"></div>' +
     '<div class="english-day-header">' +
       '<span class="date-text" id="engSelectedDate"></span>' +
@@ -4111,6 +4116,25 @@ function renderEnglish() {
   });
   // AI 生成计划
   document.getElementById('engAiPlanBtn').addEventListener('click', showEnglishAiPlanForm);
+
+  // 周翻页
+  if (window._englishWeekOffset === undefined) window._englishWeekOffset = 0;
+  const weekLabel = document.getElementById('engWeekLabel');
+  if (weekLabel) {
+    if (window._englishWeekOffset === 0) weekLabel.textContent = '本周';
+    else if (window._englishWeekOffset > 0) weekLabel.textContent = '第' + (window._englishWeekOffset + 1) + '周后';
+    else weekLabel.textContent = '第' + (-window._englishWeekOffset) + '周前';
+  }
+  const prevBtn = document.getElementById('engPrevWeek');
+  if (prevBtn) prevBtn.addEventListener('click', function() {
+    window._englishWeekOffset--;
+    renderEnglish();
+  });
+  const nextBtn = document.getElementById('engNextWeek');
+  if (nextBtn) nextBtn.addEventListener('click', function() {
+    window._englishWeekOffset++;
+    renderEnglish();
+  });
 
   renderEnglishWeekCalendar();
   loadEnglishDayTasks();
@@ -4192,11 +4216,12 @@ function loadDailyQuote() {
   }
 }
 
-function getWeekDates() {
+function getWeekDates(offset) {
+  offset = offset || 0;
   const now = new Date();
   const dayOfWeek = now.getDay() || 7;
   const monday = new Date(now);
-  monday.setDate(now.getDate() - dayOfWeek + 1);
+  monday.setDate(now.getDate() - dayOfWeek + 1 + offset * 7);
   const dates = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
@@ -4208,7 +4233,8 @@ function getWeekDates() {
 
 function renderEnglishWeekCalendar() {
   const calendar = document.getElementById('engWeekCalendar');
-  const dates = getWeekDates();
+  const offset = window._englishWeekOffset || 0;
+  const dates = getWeekDates(offset);
   const dayNames = ['周一','周二','周三','周四','周五','周六','周日'];
   const today = todayStr();
   const selected = window._englishSelectedDate;
@@ -4280,7 +4306,7 @@ function loadEnglishDayTasks() {
       byDate[t.date].total++;
       if (t.completed) byDate[t.date].done++;
     });
-    getWeekDates().forEach(function(ds) {
+    getWeekDates(window._englishWeekOffset || 0).forEach(function(ds) {
       const mark = document.getElementById('eng-mark-' + ds);
       if (mark && byDate[ds]) {
         mark.textContent = byDate[ds].done + '/' + byDate[ds].total;
