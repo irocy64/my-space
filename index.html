@@ -6634,25 +6634,36 @@ function removeAiTyping() {
 
 async function callDoubaoApi(messages) {
   if (!aiApiKey) throw new Error('请先配置 API Key');
+  const body = {
+    model: AI_MODEL,
+    messages: messages,
+    temperature: 0.7,
+    max_tokens: 2048
+  };
+  if (window._aiThinkingEnabled) {
+    body.thinking = { type: 'enabled' };
+  } else {
+    body.thinking = { type: 'disabled' };
+  }
   const res = await fetch(AI_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + aiApiKey
     },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 2048
-    })
+    body: JSON.stringify(body)
   });
   if (!res.ok) {
     const errText = await res.text();
     throw new Error('API 错误 ' + res.status + ': ' + errText.slice(0, 200));
   }
   const data = await res.json();
-  return data.choices[0].message.content;
+  const msg = data.choices[0].message;
+  // 如果有思考内容，拼接到回复前面
+  if (msg.reasoning_content && msg.reasoning_content.trim()) {
+    return '💭 思考过程：\n' + msg.reasoning_content + '\n\n---\n\n' + msg.content;
+  }
+  return msg.content;
 }
 
 async function sendAiMessage(text) {
@@ -6713,6 +6724,17 @@ function initAiAssistant() {
   document.querySelectorAll('.ai-quick-btn').forEach(function(btn) {
     btn.addEventListener('click', function() { sendAiMessage(btn.dataset.prompt); });
   });
+  // 深度思考开关
+  const thinkingToggle = document.getElementById('aiThinkingToggle');
+  if (thinkingToggle) {
+    thinkingToggle.addEventListener('change', function() {
+      window._aiThinkingEnabled = this.checked;
+      localStorage.setItem('aiThinkingEnabled', this.checked ? '1' : '0');
+    });
+    // 恢复上次状态
+    window._aiThinkingEnabled = localStorage.getItem('aiThinkingEnabled') === '1';
+    thinkingToggle.checked = window._aiThinkingEnabled;
+  }
   loadAiKey();
 }
 
@@ -6943,6 +6965,12 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
       <input type="password" id="aiApiKeyInput" placeholder="粘贴火山引擎豆包 API Key">
       <button id="aiSaveKeyBtn">保存</button>
       <span id="aiKeyStatus" style="color:#4caf50;"></span>
+    </div>
+    <div class="ai-settings-row">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-light);">
+        <input type="checkbox" id="aiThinkingToggle" style="cursor:pointer;">
+        深度思考（开启后响应较慢，但会显示思考过程）
+      </label>
     </div>
   </div>
 </div>
