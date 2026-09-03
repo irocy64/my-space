@@ -4401,51 +4401,74 @@ function showEnglishAiPlanForm() {
 
 // 从AI回复中解析英语学习计划（通用函数）
 function parseEnglishPlanFromText(reply) {
+  if (!reply) return null;
   let data = null;
   // 方法1：直接解析JSON
   try {
     const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
     if (cleaned.startsWith('{')) data = JSON.parse(cleaned);
   } catch(e) {}
-  // 方法2：正则提取JSON对象
+  // 方法2：正则提取JSON对象（更宽松）
   if (!data) {
-    const jsonMatch = reply.match(/\{[\s\S]*?"plan"[\s\S]*\}/);
+    const jsonMatch = reply.match(/\{[\s\S]*?"plan"[\s\S]*?\}/);
     if (jsonMatch) {
       try {
-        let jsonStr = jsonMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
-        data = JSON.parse(jsonStr);
+        data = JSON.parse(jsonMatch[0]);
       } catch(e) {}
     }
   }
-  // 方法3：从markdown中按天提取任务
+  // 方法3：从markdown中按天提取任务（增强版）
   if (!data || !data.plan) {
     const plan = [];
-    const dayRegex = /(?:第\s*(\d+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
+    // 匹配更多天的格式：第1天、第一天、Day 1、Day1、day1、第 1 天
+    const dayRegex = /(?:第\s*(\d+|[一二三四五六七八九十]+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
     let match;
     const dayPositions = [];
+    const chineseNumMap = { '一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9, '十':10 };
     while ((match = dayRegex.exec(reply)) !== null) {
-      const dayNum = parseInt(match[1] || match[2] || match[3]);
+      let dayNum = parseInt(match[1] || match[2] || match[3]);
+      if (isNaN(dayNum) && match[1]) dayNum = chineseNumMap[match[1]] || 1;
       dayPositions.push({ day: dayNum, start: match.index });
+    }
+    // 如果没找到"第X天"，尝试按 ## 标题或数字编号分段
+    if (dayPositions.length === 0) {
+      const sections = reply.split(/\n(?=\d+[.、\s])|\n(?=##)/);
+      if (sections.length > 1) {
+        for (let i = 0; i < sections.length; i++) {
+          const section = sections[i].trim();
+          if (section.length > 10) {
+            dayPositions.push({ day: i + 1, start: reply.indexOf(section) });
+          }
+        }
+      }
     }
     for (let i = 0; i < dayPositions.length; i++) {
       const dayInfo = dayPositions[i];
       const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : reply.length;
       const dayText = reply.slice(dayInfo.start, end);
-      const taskLines = dayText.match(/[-*]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
+      // 匹配任务行：-、*、数字.、数字、、•、◦
+      const taskLines = dayText.match(/[-*•◦]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
       const tasks = [];
       for (const line of taskLines) {
-        const content = line.replace(/^[-*]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
-        if (content && content.length > 2) {
+        const content = line.replace(/^[-*•◦]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
+        if (content && content.length > 2 && content.length < 200) {
           let type = 'other';
-          if (/单词|词汇|vocab|word/i.test(content)) type = 'vocabulary';
-          else if (/阅读|read|reading|仔细阅读|长篇阅读/i.test(content)) type = 'reading';
-          else if (/听力|listen|listening|精听|泛听/i.test(content)) type = 'listening';
-          else if (/写作|作文|write|writing|翻译|translation/i.test(content)) type = 'writing';
-          else if (/口语|speak|speaking/i.test(content)) type = 'speaking';
+          if (/单词|词汇|vocab|word|背/i.test(content)) type = 'vocabulary';
+          else if (/阅读|read|reading|仔细阅读|长篇阅读|篇章/i.test(content)) type = 'reading';
+          else if (/听力|listen|listening|精听|泛听|听写/i.test(content)) type = 'listening';
+          else if (/写作|作文|write|writing|翻译|translation|范文/i.test(content)) type = 'writing';
+          else if (/口语|speak|speaking|跟读|朗读/i.test(content)) type = 'speaking';
           let duration = 30;
           const durMatch = content.match(/(\d+)\s*(分钟|min|minute)/i);
           if (durMatch) duration = parseInt(durMatch[1]);
           tasks.push({ type: type, content: content, duration: duration });
+        }
+      }
+      // 如果没找到任务行，把整段作为一个任务
+      if (tasks.length === 0) {
+        const cleanText = dayText.replace(/第\s*\d+\s*天[：:]?\s*/i, '').replace(/Day\s*\d+[：:]?\s*/i, '').trim();
+        if (cleanText.length > 5 && cleanText.length < 200) {
+          tasks.push({ type: 'other', content: cleanText, duration: 30 });
         }
       }
       if (tasks.length > 0) plan.push({ day: dayInfo.day, tasks: tasks });
@@ -4508,8 +4531,40 @@ JSON格式如下：
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
     const data = parseEnglishPlanFromText(reply);
     if (!data || !data.plan || !Array.isArray(data.plan) || data.plan.length === 0) {
-      showToast('AI返回格式无法解析，请重试或简化需求', 'error');
       console.log('AI原始回复:', reply);
+      // 显示AI原始回复，让用户看到并选择
+      openModal({
+        title: 'AI 返回内容（无法自动解析）',
+        bodyHTML:
+          '<div style="max-height:400px;overflow-y:auto;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">' +
+          escapeHtml(reply) +
+          '</div>' +
+          '<div style="margin-top:12px;font-size:12px;color:var(--text-light);">AI 没有按要求返回结构化格式。你可以：</div>' +
+          '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">' +
+            '<button class="btn-primary" id="saveAsEnglishNote" style="padding:6px 14px;font-size:13px;">保存为学习笔记</button>' +
+            '<button class="btn-secondary" id="retryEnglishPlan" style="padding:6px 14px;font-size:13px;">重新生成</button>' +
+          '</div>',
+        confirmText: '关闭',
+        onConfirm: function() { return true; }
+      });
+      setTimeout(function() {
+        const saveBtn = document.getElementById('saveAsEnglishNote');
+        if (saveBtn) saveBtn.addEventListener('click', async function() {
+          await dbAdd('english', {
+            id: genId(), date: todayStr(), type: 'other',
+            content: reply.slice(0, 500), duration: 0, completed: false,
+            createdAt: Date.now(), aiGenerated: true
+          });
+          showToast('已保存为学习笔记', 'success');
+          closeModal();
+          renderEnglish();
+        });
+        const retryBtn = document.getElementById('retryEnglishPlan');
+        if (retryBtn) retryBtn.addEventListener('click', function() {
+          closeModal();
+          showEnglishAiPlanForm();
+        });
+      }, 100);
       return;
     }
     const totalTasks = await saveEnglishPlanToDB(data);
