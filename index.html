@@ -5669,8 +5669,38 @@ JSON格式：
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
     const data = parseWorkoutPlanFromText(reply);
     if (!data || !data.plan || data.plan.length === 0) {
-      showToast('AI返回格式无法解析，请重试', 'error');
       console.log('AI原始回复:', reply);
+      openModal({
+        title: 'AI 返回内容（无法自动解析）',
+        bodyHTML:
+          '<div style="max-height:400px;overflow-y:auto;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">' +
+          escapeHtml(reply) +
+          '</div>' +
+          '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
+            '<button class="btn-primary" id="saveAsWorkoutNote" style="padding:6px 14px;font-size:13px;">保存为训练笔记</button>' +
+            '<button class="btn-secondary" id="retryWorkoutPlan" style="padding:6px 14px;font-size:13px;">重新生成</button>' +
+          '</div>',
+        confirmText: '关闭',
+        onConfirm: function() { return true; }
+      });
+      setTimeout(function() {
+        const saveBtn = document.getElementById('saveAsWorkoutNote');
+        if (saveBtn) saveBtn.addEventListener('click', async function() {
+          await dbAdd('workouts', {
+            id: genId(), date: todayStr(), muscleGroup: 'AI生成',
+            duration: 0, exercises: [], notes: reply.slice(0, 500),
+            createdAt: Date.now(), aiGenerated: true
+          });
+          showToast('已保存为训练笔记', 'success');
+          closeModal();
+          renderWorkouts();
+        });
+        const retryBtn = document.getElementById('retryWorkoutPlan');
+        if (retryBtn) retryBtn.addEventListener('click', function() {
+          closeModal();
+          showWorkoutAiPlanForm();
+        });
+      }, 100);
       return;
     }
     const total = await saveWorkoutPlanToDB(data);
@@ -6644,8 +6674,38 @@ JSON格式：
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
     const data = parseBookPlanFromText(reply);
     if (!data || !data.plan || data.plan.length === 0) {
-      showToast('AI返回格式无法解析，请重试', 'error');
       console.log('AI原始回复:', reply);
+      openModal({
+        title: 'AI 返回内容（无法自动解析）',
+        bodyHTML:
+          '<div style="max-height:400px;overflow-y:auto;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">' +
+          escapeHtml(reply) +
+          '</div>' +
+          '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
+            '<button class="btn-primary" id="saveAsBookNote" style="padding:6px 14px;font-size:13px;">保存为读书想法</button>' +
+            '<button class="btn-secondary" id="retryBookPlan" style="padding:6px 14px;font-size:13px;">重新生成</button>' +
+          '</div>',
+        confirmText: '关闭',
+        onConfirm: function() { return true; }
+      });
+      setTimeout(function() {
+        const saveBtn = document.getElementById('saveAsBookNote');
+        if (saveBtn) saveBtn.addEventListener('click', async function() {
+          await dbAdd('books', {
+            id: genId(), title: reply.slice(0, 30), author: 'AI生成',
+            status: 'want', progress: 0, rating: 0, notes: reply,
+            createdAt: Date.now(), updatedAt: Date.now(), aiGenerated: true
+          });
+          showToast('已保存为读书想法', 'success');
+          closeModal();
+          renderBooks();
+        });
+        const retryBtn = document.getElementById('retryBookPlan');
+        if (retryBtn) retryBtn.addEventListener('click', function() {
+          closeModal();
+          showBookAiPlanForm();
+        });
+      }, 100);
       return;
     }
     const result = await saveBookPlanToDB(data, title, author);
