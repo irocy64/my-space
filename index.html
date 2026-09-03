@@ -6338,6 +6338,26 @@ function renderSettings() {
       '<div style="font-size:12px;color:var(--text-light);margin-top:8px;">提示：预设模块可隐藏/显示（数据保留），自定义模块可删除（删除会清空该模块数据）</div>' +
     '</div>' +
     '<div class="settings-section">' +
+      '<div class="section-title">🤖 AI 助手设置</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<label style="font-size:13px;color:var(--text);display:block;margin-bottom:6px;">火山引擎豆包 API Key</label>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<input type="password" id="settingsAiApiKey" placeholder="粘贴 API Key（ark-开头）" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:13px;">' +
+          '<button class="btn-primary" id="settingsAiSaveKeyBtn" style="white-space:nowrap;">保存</button>' +
+        '</div>' +
+        '<div id="settingsAiKeyStatus" style="font-size:12px;color:#4caf50;margin-top:6px;"></div>' +
+      '</div>' +
+      '<div style="margin-bottom:8px;">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text);">' +
+          '<input type="checkbox" id="settingsAiThinkingToggle" style="cursor:pointer;">' +
+          '深度思考模式（开启后响应较慢，但推理更深入，会显示思考过程）' +
+        '</label>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text-light);margin-top:8px;">' +
+        '当前模型：doubao-seed-2-1-turbo-260628 | API Key 仅保存在本地浏览器，不会上传' +
+      '</div>' +
+    '</div>' +
+    '<div class="settings-section">' +
       '<div class="section-title">📊 各模块数据统计</div>' +
       '<div class="module-stats-grid" id="moduleStatsGrid"></div>' +
     '</div>' +
@@ -6375,6 +6395,31 @@ function renderSettings() {
   renderModuleManage();
 
   document.getElementById('addCustomModuleBtn').addEventListener('click', function() { showAddCustomModuleForm(); });
+
+  // AI 设置
+  const settingsAiKeyInput = document.getElementById('settingsAiApiKey');
+  const settingsAiKeyStatus = document.getElementById('settingsAiKeyStatus');
+  if (settingsAiKeyInput) {
+    dbGet('settings', 'aiApiKey').then(function(data) {
+      if (data && data.key) settingsAiKeyInput.value = data.key;
+    });
+  }
+  document.getElementById('settingsAiSaveKeyBtn').addEventListener('click', function() {
+    const key = settingsAiKeyInput.value.trim();
+    if (key) {
+      saveAiKey(key);
+      settingsAiKeyStatus.textContent = '已保存 ✓';
+      setTimeout(function() { settingsAiKeyStatus.textContent = ''; }, 3000);
+    }
+  });
+  const settingsThinkingToggle = document.getElementById('settingsAiThinkingToggle');
+  if (settingsThinkingToggle) {
+    settingsThinkingToggle.checked = window._aiThinkingEnabled === true;
+    settingsThinkingToggle.addEventListener('change', function() {
+      window._aiThinkingEnabled = this.checked;
+      localStorage.setItem('aiThinkingEnabled', this.checked ? '1' : '0');
+    });
+  }
 
   document.getElementById('exportDataBtn').addEventListener('click', exportAllData);
 
@@ -6602,6 +6647,15 @@ function openAiModal() {
   document.getElementById('aiModalOverlay').classList.add('show');
   document.getElementById('aiInput').focus();
   loadAiHistory();
+  // 检查API Key
+  const noKeyHint = document.getElementById('aiNoKeyHint');
+  if (noKeyHint) {
+    if (!aiApiKey) {
+      noKeyHint.style.display = 'block';
+    } else {
+      noKeyHint.style.display = 'none';
+    }
+  }
 }
 function closeAiModal() {
   document.getElementById('aiModalOverlay').classList.remove('show');
@@ -6611,10 +6665,28 @@ function appendAiMessage(role, content) {
   const container = document.getElementById('aiMessages');
   const div = document.createElement('div');
   div.className = 'ai-msg ' + role;
-  div.innerHTML = '<div class="msg-avatar">' + (role === 'user' ? '🧑' : '🤖') + '</div>' +
+  let html = '<div class="msg-avatar">' + (role === 'user' ? '🧑' : '🤖') + '</div>' +
     '<div class="msg-bubble">' + escapeHtml(content) + '</div>';
+  // AI回复后添加保存到模块按钮
+  if (role === 'assistant' && !content.startsWith('出错了') && !content.startsWith('请先')) {
+    html += '<div class="ai-save-row" style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">' +
+      '<button class="ai-save-btn" data-action="save-note" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">📝 存为笔记</button>' +
+      '<button class="ai-save-btn" data-action="save-task" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">✅ 存为待办</button>' +
+      '<button class="ai-save-btn" data-action="save-idea" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">💡 存为灵感</button>' +
+      '<button class="ai-save-btn" data-action="save-custom" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-light);cursor:pointer;">📁 存到自定义模块</button>' +
+    '</div>';
+  }
+  div.innerHTML = html;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
+  // 绑定保存按钮事件
+  if (role === 'assistant') {
+    div.querySelectorAll('.ai-save-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        saveAiContentToModule(btn.dataset.action, content);
+      });
+    });
+  }
   return div;
 }
 
@@ -6632,13 +6704,94 @@ function removeAiTyping() {
   if (el) el.remove();
 }
 
+// AI内容保存到模块
+async function saveAiContentToModule(action, content) {
+  const title = content.slice(0, 30).replace(/\n/g, ' ') + (content.length > 30 ? '...' : '');
+  try {
+    if (action === 'save-task') {
+      // 存为待办
+      await dbAdd('tasks', {
+        id: genId(),
+        title: title,
+        content: content,
+        date: todayStr(),
+        completed: false,
+        createdAt: Date.now(),
+        aiGenerated: true
+      });
+      showToast('已保存到待办事项', 'success');
+    } else if (action === 'save-idea') {
+      // 存为自媒体灵感
+      await dbAdd('media', {
+        id: genId(),
+        title: title,
+        status: 'idea',
+        publishDate: null,
+        platform: '',
+        idea: content,
+        notes: 'AI对话生成',
+        views: null, likes: null, comments: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        aiGenerated: true
+      });
+      showToast('已保存到自媒体灵感库', 'success');
+    } else if (action === 'save-note') {
+      // 存为笔记 - 检查是否有笔记自定义模块，没有则创建
+      let noteModule = window._moduleConfig?.customModules?.find(m => m.name === 'AI笔记');
+      if (!noteModule) {
+        noteModule = { id: 'custom-ai-notes', name: 'AI笔记', icon: '📝', color: '#4fc3f7', createdAt: Date.now() };
+        if (!window._moduleConfig) window._moduleConfig = { hiddenModules: [], customModules: [] };
+        window._moduleConfig.customModules.push(noteModule);
+        await saveModuleConfig();
+      }
+      await dbAdd('customItems', {
+        id: genId(),
+        moduleId: noteModule.id,
+        title: title,
+        content: content,
+        date: todayStr(),
+        createdAt: Date.now()
+      });
+      showToast('已保存到「AI笔记」模块', 'success');
+    } else if (action === 'save-custom') {
+      // 让用户选择自定义模块
+      const customModules = window._moduleConfig?.customModules || [];
+      if (customModules.length === 0) {
+        showToast('请先在设置中创建自定义模块', 'error');
+        return;
+      }
+      const moduleNames = customModules.map((m, i) => (i+1) + '. ' + m.name).join('\\n');
+      const idx = prompt('选择要保存到的自定义模块：\\n' + moduleNames);
+      if (!idx) return;
+      const moduleIdx = parseInt(idx) - 1;
+      if (isNaN(moduleIdx) || moduleIdx < 0 || moduleIdx >= customModules.length) {
+        showToast('选择无效', 'error');
+        return;
+      }
+      const targetModule = customModules[moduleIdx];
+      await dbAdd('customItems', {
+        id: genId(),
+        moduleId: targetModule.id,
+        title: title,
+        content: content,
+        date: todayStr(),
+        createdAt: Date.now()
+      });
+      showToast('已保存到「' + targetModule.name + '」', 'success');
+    }
+  } catch(err) {
+    showToast('保存失败：' + err.message, 'error');
+  }
+}
+
 async function callDoubaoApi(messages) {
   if (!aiApiKey) throw new Error('请先配置 API Key');
   const body = {
     model: AI_MODEL,
     messages: messages,
     temperature: 0.7,
-    max_tokens: 2048
+    max_tokens: 1024
   };
   if (window._aiThinkingEnabled) {
     body.thinking = { type: 'enabled' };
@@ -6717,24 +6870,11 @@ function initAiAssistant() {
   document.getElementById('aiInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiMessage(this.value); }
   });
-  document.getElementById('aiSaveKeyBtn').addEventListener('click', function() {
-    const key = document.getElementById('aiApiKeyInput').value.trim();
-    if (key) saveAiKey(key);
-  });
   document.querySelectorAll('.ai-quick-btn').forEach(function(btn) {
     btn.addEventListener('click', function() { sendAiMessage(btn.dataset.prompt); });
   });
-  // 深度思考开关
-  const thinkingToggle = document.getElementById('aiThinkingToggle');
-  if (thinkingToggle) {
-    thinkingToggle.addEventListener('change', function() {
-      window._aiThinkingEnabled = this.checked;
-      localStorage.setItem('aiThinkingEnabled', this.checked ? '1' : '0');
-    });
-    // 恢复上次状态
-    window._aiThinkingEnabled = localStorage.getItem('aiThinkingEnabled') === '1';
-    thinkingToggle.checked = window._aiThinkingEnabled;
-  }
+  // 初始化深度思考状态
+  window._aiThinkingEnabled = localStorage.getItem('aiThinkingEnabled') === '1';
   loadAiKey();
 }
 
@@ -6960,17 +7100,8 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
       <textarea id="aiInput" placeholder="输入你的需求，Shift+Enter换行..." rows="1"></textarea>
       <button class="ai-send-btn" id="aiSendBtn">发送</button>
     </div>
-    <div class="ai-settings-row">
-      <span>API Key:</span>
-      <input type="password" id="aiApiKeyInput" placeholder="粘贴火山引擎豆包 API Key">
-      <button id="aiSaveKeyBtn">保存</button>
-      <span id="aiKeyStatus" style="color:#4caf50;"></span>
-    </div>
-    <div class="ai-settings-row">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-light);">
-        <input type="checkbox" id="aiThinkingToggle" style="cursor:pointer;">
-        深度思考（开启后响应较慢，但会显示思考过程）
-      </label>
+    <div id="aiNoKeyHint" style="display:none;padding:10px;background:rgba(255,152,0,0.1);border-radius:8px;font-size:12px;color:#ff9800;text-align:center;">
+      ⚠️ 尚未配置 API Key，请前往「设置」页面配置火山引擎豆包 API Key
     </div>
   </div>
 </div>
