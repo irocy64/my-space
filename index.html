@@ -4399,6 +4399,88 @@ function showEnglishAiPlanForm() {
   });
 }
 
+// 从AI回复中解析英语学习计划（通用函数）
+function parseEnglishPlanFromText(reply) {
+  let data = null;
+  // 方法1：直接解析JSON
+  try {
+    const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+    if (cleaned.startsWith('{')) data = JSON.parse(cleaned);
+  } catch(e) {}
+  // 方法2：正则提取JSON对象
+  if (!data) {
+    const jsonMatch = reply.match(/\{[\s\S]*?"plan"[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        let jsonStr = jsonMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
+        data = JSON.parse(jsonStr);
+      } catch(e) {}
+    }
+  }
+  // 方法3：从markdown中按天提取任务
+  if (!data || !data.plan) {
+    const plan = [];
+    const dayRegex = /(?:第\s*(\d+)\s*天|Day\s*(\d+)|day\s*(\d+))/gi;
+    let match;
+    const dayPositions = [];
+    while ((match = dayRegex.exec(reply)) !== null) {
+      const dayNum = parseInt(match[1] || match[2] || match[3]);
+      dayPositions.push({ day: dayNum, start: match.index });
+    }
+    for (let i = 0; i < dayPositions.length; i++) {
+      const dayInfo = dayPositions[i];
+      const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : reply.length;
+      const dayText = reply.slice(dayInfo.start, end);
+      const taskLines = dayText.match(/[-*]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
+      const tasks = [];
+      for (const line of taskLines) {
+        const content = line.replace(/^[-*]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
+        if (content && content.length > 2) {
+          let type = 'other';
+          if (/单词|词汇|vocab|word/i.test(content)) type = 'vocabulary';
+          else if (/阅读|read|reading|仔细阅读|长篇阅读/i.test(content)) type = 'reading';
+          else if (/听力|listen|listening|精听|泛听/i.test(content)) type = 'listening';
+          else if (/写作|作文|write|writing|翻译|translation/i.test(content)) type = 'writing';
+          else if (/口语|speak|speaking/i.test(content)) type = 'speaking';
+          let duration = 30;
+          const durMatch = content.match(/(\d+)\s*(分钟|min|minute)/i);
+          if (durMatch) duration = parseInt(durMatch[1]);
+          tasks.push({ type: type, content: content, duration: duration });
+        }
+      }
+      if (tasks.length > 0) plan.push({ day: dayInfo.day, tasks: tasks });
+    }
+    if (plan.length > 0) data = { plan: plan };
+  }
+  return data;
+}
+
+// 保存英语计划到数据库（通用函数）
+async function saveEnglishPlanToDB(data) {
+  const today = new Date();
+  let totalTasks = 0;
+  for (const dayPlan of data.plan) {
+    const dayOffset = dayPlan.day - 1;
+    const date = new Date(today);
+    date.setDate(today.getDate() + dayOffset);
+    const dateStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+    for (const task of dayPlan.tasks) {
+      await dbAdd('english', {
+        id: genId(),
+        date: dateStr,
+        type: task.type || 'other',
+        content: task.content || '学习任务',
+        duration: task.duration || 30,
+        completed: false,
+        createdAt: Date.now(),
+        aiGenerated: true
+      });
+      totalTasks++;
+    }
+  }
+  return totalTasks;
+}
+
 async function generateEnglishAiPlan(goal, days, hours) {
   if (!aiApiKey) {
     showToast('请先在 AI 助手中配置 API Key', 'error');
@@ -4410,74 +4492,27 @@ async function generateEnglishAiPlan(goal, days, hours) {
 备考天数：${days}天
 每天可学习时间：${hours}小时
 
-请严格按以下JSON格式返回（只返回JSON，不要任何其他文字、解释或markdown标记）：
-{"plan":[{"day":1,"tasks":[{"type":"vocabulary","content":"具体学习内容","duration":30}]},{"day":2,"tasks":[...]}]}
+【重要】你的回复必须是一个纯JSON对象，不能包含任何其他文字、解释、markdown标记或代码块。直接以{开头，以}结尾。
 
-要求：
-1. type只能是：vocabulary(单词), reading(阅读), listening(听力), writing(写作), speaking(口语), other(其他)
+JSON格式如下：
+{"plan":[{"day":1,"tasks":[{"type":"vocabulary","content":"背50个六级核心词汇","duration":30},{"type":"listening","content":"精听1篇真题听力","duration":40}]},{"day":2,"tasks":[...]}]}
+
+规则：
+1. type只能是：vocabulary、reading、listening、writing、speaking、other
 2. duration单位是分钟，每天任务总时长不超过${hours * 60}分钟
-3. 任务内容要具体可执行，比如"背50个六级核心词汇"而不是"背单词"
-4. 前${Math.min(days, 7)}天的任务要详细，后面的可以适当重复但内容要有变化
-5. 要覆盖单词、阅读、听力、写作等多个维度，合理搭配`;
+3. 任务内容要具体可执行
+4. 必须覆盖${days}天，每天都要有任务
+5. 只返回JSON，不要任何其他内容`;
 
   try {
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
-    // 从回复中提取JSON（更健壮的方式）
-    let data = null;
-    // 先尝试直接解析
-    try {
-      const cleaned = reply.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
-      data = JSON.parse(cleaned);
-    } catch(e1) {
-      // 尝试用正则提取第一个JSON对象
-      const jsonMatch = reply.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          // 处理JSON中的换行符
-          let jsonStr = jsonMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
-          data = JSON.parse(jsonStr);
-        } catch(e2) {
-          // 再尝试提取plan数组
-          const planMatch = reply.match(/\[[\s\S]*\]/);
-          if (planMatch) {
-            try {
-              let planStr = planMatch[0].replace(/\n/g, '\\n').replace(/\r/g, '');
-              const plan = JSON.parse(planStr);
-              data = { plan: plan };
-            } catch(e3) {}
-          }
-        }
-      }
-    }
-
-    if (!data || !data.plan || !Array.isArray(data.plan)) {
-      showToast('AI返回格式不正确，原始回复已显示在控制台', 'error');
+    const data = parseEnglishPlanFromText(reply);
+    if (!data || !data.plan || !Array.isArray(data.plan) || data.plan.length === 0) {
+      showToast('AI返回格式无法解析，请重试或简化需求', 'error');
       console.log('AI原始回复:', reply);
       return;
     }
-
-    // 批量创建任务
-    const today = new Date();
-    let totalTasks = 0;
-    for (const dayPlan of data.plan) {
-      const dayOffset = dayPlan.day - 1;
-      const date = new Date(today);
-      date.setDate(today.getDate() + dayOffset);
-      const dateStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
-      for (const task of dayPlan.tasks) {
-        await dbAdd('english', {
-          id: genId(),
-          date: dateStr,
-          type: task.type || 'other',
-          content: task.content || '学习任务',
-          duration: task.duration || 30,
-          completed: false,
-          createdAt: Date.now(),
-          aiGenerated: true
-        });
-        totalTasks++;
-      }
-    }
+    const totalTasks = await saveEnglishPlanToDB(data);
     showToast('已生成 ' + totalTasks + ' 个学习任务，覆盖 ' + data.plan.length + ' 天', 'success');
     renderEnglish();
   } catch(err) {
@@ -6985,18 +7020,25 @@ async function saveAiToModule(module, content) {
   const title = content.slice(0, 30).replace(/\n/g, ' ') + (content.length > 30 ? '...' : '');
   try {
     if (module === 'english') {
-      // 存到英语 - 作为学习笔记/计划
-      await dbAdd('english', {
-        id: genId(),
-        date: todayStr(),
-        type: 'other',
-        content: content,
-        duration: 0,
-        completed: false,
-        createdAt: Date.now(),
-        aiGenerated: true
-      });
-      showToast('已保存到英语学习模块', 'success');
+      // 尝试解析为结构化学习计划
+      const planData = parseEnglishPlanFromText(content);
+      if (planData && planData.plan && planData.plan.length > 0) {
+        const total = await saveEnglishPlanToDB(planData);
+        showToast('已解析并保存 ' + total + ' 个学习任务到英语模块', 'success');
+      } else {
+        // 不是计划格式，存为一条学习笔记
+        await dbAdd('english', {
+          id: genId(),
+          date: todayStr(),
+          type: 'other',
+          content: content,
+          duration: 0,
+          completed: false,
+          createdAt: Date.now(),
+          aiGenerated: true
+        });
+        showToast('已保存到英语学习模块', 'success');
+      }
     } else if (module === 'books') {
       // 存到读书
       await dbAdd('books', {
