@@ -6652,7 +6652,7 @@ JSON格式：
     showToast('已生成 ' + result.total + ' 天阅读计划，已创建「阅读计划」模块', 'success');
     renderBooks();
     if (typeof renderSidebar === 'function') renderSidebar();
-    setTimeout(function() { navigateTo('books'); }, 800);
+    setTimeout(function() { navigateTo(result.moduleId); }, 800);
   } catch(err) {
     console.error('阅读计划生成失败', err);
     showToast('生成失败：' + err.message, 'error');
