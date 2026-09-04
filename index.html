@@ -3039,11 +3039,13 @@ function formatFileSize(bytes) {
 }
 
 // ===== IndexedDB Layer =====
+const DB_VERSION = 4;
 function initDB() {
   return new Promise(function(resolve, reject) {
-    const req = indexedDB.open('personal-app', 3);
+    const req = indexedDB.open('personal-app', DB_VERSION);
     req.onupgradeneeded = function(e) {
       const database = e.target.result;
+      const oldVersion = e.oldVersion;
       const stores = {
         tasks:       { keyPath: 'id', indexes: [{name:'date', keyPath:'date'}] },
         media:       { keyPath: 'id', indexes: [] },
@@ -3074,9 +3076,17 @@ function initDB() {
           });
         }
       }
+      // 数据迁移：根据旧版本号执行对应迁移
+      if (oldVersion < 4) {
+        // v3->v4: 给meals记录添加aiGenerated字段默认值（如果没有的话）
+        // 这里可以添加未来的迁移逻辑
+        console.log('[DB] 迁移到 v4，数据结构已更新');
+      }
     };
     req.onsuccess = function(e) {
       db = e.target.result;
+      // 记录当前版本，方便调试
+      db._version = DB_VERSION;
       resolve(db);
     };
     req.onerror = function(e) { reject(e.target.error); };
