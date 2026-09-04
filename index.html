@@ -6009,28 +6009,72 @@ function parseWorkoutPlanFromText(reply) {
         const phase = phases[i];
         const end = i < phases.length - 1 ? phases[i+1].startIndex : cleanedReply.length;
         const phaseText = cleanedReply.slice(phase.startIndex, end);
-        // 提取阶段内的所有训练
-        const tempPlan = [];
-        const origPush = plan.push;
-        const oldLen = plan.length;
-        processDay(1, phase.startIndex, end);
-        const phaseExercises = [];
-        const phaseMuscle = [];
-        for (let k = oldLen; k < plan.length; k++) {
-          phaseExercises.push(...plan[k].exercises);
-          if (plan[k].muscleGroup) phaseMuscle.push(plan[k].muscleGroup);
+        
+        // 先尝试识别阶段内的多个训练日（周一：胸、Day1：背等）
+        const innerDayRegex = /(?:(周[一二三四五六日天]|星期[一二三四五六日天]|Day\s*\d+|day\s*\d+|第\s*\d+\s*天)\s*[:：]\s*(.+?)(?=\n(?:周[一二三四五六日天]|星期[一二三四五六日天]|Day\s*\d+|day\s*\d+|第\s*\d+\s*天)\s*[:：]|$))/gims;
+        const innerDays = [];
+        let im;
+        while ((im = innerDayRegex.exec(phaseText)) !== null) {
+          innerDays.push({ label: im[1], content: im[2] });
         }
-        plan.length = oldLen; // 回退
-        if (phaseExercises.length > 0 && phase.end >= phase.start) {
+        
+        if (innerDays.length > 0) {
+          // 阶段内有多个训练日，按顺序分配到阶段的每一天
           const numDays = phase.end - phase.start + 1;
           for (let d = 0; d < numDays; d++) {
-            plan.push({
-              day: phase.start + d,
-              muscleGroup: phaseMuscle[d % phaseMuscle.length] || '综合训练',
-              duration: 60,
-              exercises: phaseExercises.map(function(e) { return { name: e.name, weight: null, sets: e.sets, reps: e.reps, notes: '' }; }),
-              notes: ''
-            });
+            const dayInfo = innerDays[d % innerDays.length];
+            const dayText = dayInfo.content;
+            let muscleGroup = '综合训练';
+            const muscleMatch = dayText.match(/(胸|背|腿|肩|手臂|核心|有氧|休息|全身|推拉腿|推日|拉日|腿日)/);
+            if (muscleMatch) muscleGroup = muscleMatch[1];
+            const exerciseLines = dayText.match(/[-*•◦]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
+            const exercises = [];
+            for (const line of exerciseLines) {
+              let name = line.replace(/^[-*•◦]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
+              name = cleanMarkdown(name);
+              if (name && name.length > 1 && name.length < 80 && !/^(第.+天|阶段|Phase|核心原则|目标|说明)/.test(name)) {
+                let sets = 3, reps = '12';
+                const setsMatch = name.match(/(\d+)\s*组/);
+                if (setsMatch) sets = parseInt(setsMatch[1]);
+                const repsMatch = name.match(/(\d+)\s*(次|个|rep)/i);
+                if (repsMatch) reps = repsMatch[1];
+                exercises.push({ name: name, weight: null, sets: sets, reps: reps, notes: '' });
+              }
+            }
+            if (exercises.length > 0 || muscleGroup !== '综合训练') {
+              plan.push({ day: phase.start + d, muscleGroup: muscleGroup, duration: 60, exercises: exercises, notes: '' });
+            }
+          }
+        } else {
+          // 阶段内没有明确的训练日，假设所有天训练内容相同
+          const exerciseLines = phaseText.match(/[-*•◦]\s+(.+)|^\d+[.、]\s+(.+)/gm) || [];
+          const phaseExercises = [];
+          for (const line of exerciseLines) {
+            let name = line.replace(/^[-*•◦]\s+/, '').replace(/^\d+[.、]\s+/, '').trim();
+            name = cleanMarkdown(name);
+            if (name && name.length > 1 && name.length < 80 && !/^(第.+天|阶段|Phase|核心原则|目标|说明|一[、.．]|二[、.．]|三[、.．])/.test(name)) {
+              let sets = 3, reps = '12';
+              const setsMatch = name.match(/(\d+)\s*组/);
+              if (setsMatch) sets = parseInt(setsMatch[1]);
+              const repsMatch = name.match(/(\d+)\s*(次|个|rep)/i);
+              if (repsMatch) reps = repsMatch[1];
+              phaseExercises.push({ name: name, weight: null, sets: sets, reps: reps, notes: '' });
+            }
+          }
+          let muscleGroup = '综合训练';
+          const muscleMatch = phaseText.match(/(胸|背|腿|肩|手臂|核心|有氧|休息|全身|推拉腿|推日|拉日|腿日)/);
+          if (muscleMatch) muscleGroup = muscleMatch[1];
+          if (phaseExercises.length > 0 && phase.end >= phase.start) {
+            const numDays = phase.end - phase.start + 1;
+            for (let d = 0; d < numDays; d++) {
+              plan.push({
+                day: phase.start + d,
+                muscleGroup: muscleGroup,
+                duration: 60,
+                exercises: phaseExercises.map(function(e) { return { name: e.name, weight: null, sets: e.sets, reps: e.reps, notes: '' }; }),
+                notes: ''
+              });
+            }
           }
         }
       }
@@ -6098,17 +6142,17 @@ async function generateWorkoutAiPlan(goal, days, weeks, level) {
 计划周期：${weeks}周（共${totalDays}次训练）
 训练水平：${level}
 
-【重要】你的回复必须是纯JSON对象，不能包含任何其他文字、解释或markdown标记。直接以{开头，以}结尾。
+【绝对要求】只返回一个JSON对象，不要任何解释、不要markdown、不要代码块标记。直接以{开头，以}结尾。
 
-JSON格式：
-{"plan":[{"day":1,"muscleGroup":"胸部","duration":60,"exercises":[{"name":"杠铃卧推","sets":4,"reps":"8-10","notes":""}]},{"day":2,"muscleGroup":"背部","duration":60,"exercises":[...]}]}
+JSON格式示例（必须严格遵循）：
+{"plan":[{"day":1,"muscleGroup":"胸部","duration":60,"exercises":[{"name":"杠铃卧推","sets":4,"reps":"8-10","notes":""},{"name":"哑铃飞鸟","sets":3,"reps":"12","notes":""}]},{"day":2,"muscleGroup":"背部","duration":60,"exercises":[{"name":"引体向上","sets":4,"reps":"8","notes":""}]}]}
 
 规则：
-1. day从1开始，连续编号，共${totalDays}天
-2. muscleGroup是训练部位（胸/背/腿/肩/手臂/核心/有氧/休息）
-3. duration单位分钟
-4. exercises是动作数组，每个动作有name、sets、reps
-5. 只返回JSON，不要任何其他内容`;
+1. day从1到${totalDays}，必须连续，不能跳过
+2. muscleGroup只能是：胸部、背部、腿部、肩部、手臂、核心、有氧、休息、全身
+3. 每个训练日至少3个动作，休息日exercises为空数组
+4. exercises每个动作必须有name、sets、reps三个字段
+5. 只返回JSON，绝对不要返回其他任何内容`;
 
   try {
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
