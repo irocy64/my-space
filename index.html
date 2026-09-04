@@ -4750,8 +4750,23 @@ function showEnglishAiPlanForm() {
       const goal = document.getElementById('aiGoalSelect').value;
       const days = parseInt(document.getElementById('aiDaysInput').value) || 30;
       const hours = parseFloat(document.getElementById('aiHoursInput').value) || 2;
-      generateEnglishAiPlan(goal, days, hours);
-      return true;
+      // 显示loading状态
+      const confirmBtn = document.querySelector('.modal .modal-confirm, .modal [class*="confirm"]');
+      if (confirmBtn) {
+        confirmBtn.textContent = '生成中...';
+        confirmBtn.disabled = true;
+        confirmBtn.style.opacity = '0.6';
+      }
+      generateEnglishAiPlan(goal, days, hours).then(function() {
+        closeModal();
+      }).catch(function() {
+        if (confirmBtn) {
+          confirmBtn.textContent = '开始生成';
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = '1';
+        }
+      });
+      return false; // 不立即关闭，等生成完成
     }
   });
 }
@@ -6168,8 +6183,23 @@ function showWorkoutAiPlanForm() {
       const days = document.getElementById('workoutAiDays').value;
       const weeks = document.getElementById('workoutAiWeeks').value;
       const level = document.getElementById('workoutAiLevel').value;
-      generateWorkoutAiPlan(goal, days, weeks, level);
-      return true;
+      // 显示loading状态
+      const confirmBtn = document.querySelector('.modal .modal-confirm, .modal [class*="confirm"]');
+      if (confirmBtn) {
+        confirmBtn.textContent = '生成中...';
+        confirmBtn.disabled = true;
+        confirmBtn.style.opacity = '0.6';
+      }
+      generateWorkoutAiPlan(goal, days, weeks, level).then(function() {
+        closeModal();
+      }).catch(function() {
+        if (confirmBtn) {
+          confirmBtn.textContent = '开始生成';
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = '1';
+        }
+      });
+      return false;
     }
   });
 }
@@ -7531,8 +7561,23 @@ function showBookAiPlanForm() {
       const author = document.getElementById('bookAiAuthor').value.trim();
       const days = document.getElementById('bookAiDays').value;
       const time = document.getElementById('bookAiTime').value;
-      generateBookAiPlan(title, author, days, time);
-      return true;
+      // 显示loading状态
+      const confirmBtn = document.querySelector('.modal .modal-confirm, .modal [class*="confirm"]');
+      if (confirmBtn) {
+        confirmBtn.textContent = '生成中...';
+        confirmBtn.disabled = true;
+        confirmBtn.style.opacity = '0.6';
+      }
+      generateBookAiPlan(title, author, days, time).then(function() {
+        closeModal();
+      }).catch(function() {
+        if (confirmBtn) {
+          confirmBtn.textContent = '开始生成';
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = '1';
+        }
+      });
+      return false;
     }
   });
 }
