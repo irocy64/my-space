@@ -3514,6 +3514,13 @@ function renderTasks() {
         '<option value="low">低优先级</option>' +
       '</select>' +
     '</div>' +
+    '<div class="ai-schedule-card card" style="margin-bottom:16px;padding:16px;display:flex;align-items:center;justify-content:space-between;">' +
+      '<div>' +
+        '<div style="font-size:16px;font-weight:600;margin-bottom:4px;">🤖 AI 智能排程</div>' +
+        '<div style="font-size:13px;color:var(--c-text-secondary);">汇总今日所有模块任务，AI 自动生成最优时间安排</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" id="aiScheduleBtn" style="padding:10px 20px;font-size:14px;">生成今日排程</button>' +
+    '</div>' +
     '<div class="tasks-groups">' +
       '<div class="task-group" data-priority="high">' +
         '<div class="task-group-title">🔴 高优先级</div>' +
@@ -3542,6 +3549,9 @@ function renderTasks() {
   });
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.onclick = function() { input.focus(); };
+
+  const scheduleBtn = document.getElementById('aiScheduleBtn');
+  if (scheduleBtn) scheduleBtn.onclick = generateTodaySchedule;
 
   loadAndRenderTasks();
 }
@@ -3576,6 +3586,155 @@ function loadAndRenderTasks() {
     if (textEl) textEl.textContent = done + '/' + total;
     if (fillEl) fillEl.style.width = (total > 0 ? (done / total * 100) : 0) + '%';
   });
+}
+
+// AI 智能排程：汇总当天各模块任务，AI 生成最优时间安排
+async function generateTodaySchedule() {
+  if (!aiApiKey) { showToast('请先在设置中配置 API Key', 'error'); return; }
+  const btn = document.getElementById('aiScheduleBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '生成中...'; }
+  showToast('AI 正在汇总今日任务并生成排程...', 'info');
+
+  try {
+    const today = todayStr();
+    // 1. 收集当天各模块任务
+    const allTasks = [];
+    // 英语任务
+    const englishTasks = await dbGetAll('english');
+    englishTasks.filter(function(t) { return t.date === today; }).forEach(function(t) {
+      allTasks.push({ module: '英语学习', content: t.content, duration: t.duration || 30, type: t.type });
+    });
+    // 健身任务
+    const workoutTasks = await dbGetAll('workouts');
+    workoutTasks.filter(function(t) { return t.date === today; }).forEach(function(t) {
+      const exerciseNames = (t.exercises || []).map(function(e) { return e.name; }).join('、');
+      allTasks.push({ module: '运动健身', content: t.muscleGroup + '训练' + (exerciseNames ? '（' + exerciseNames + '）' : ''), duration: t.duration || 60, type: 'workout' });
+    });
+    // 读书任务
+    const bookTasks = await dbGetAll('customItems');
+    bookTasks.filter(function(t) { return t.date === today && t.moduleId === 'reading-plan'; }).forEach(function(t) {
+      allTasks.push({ module: '阅读计划', content: t.content || '阅读', duration: 30, type: 'reading' });
+    });
+    // 自定义模块任务
+    const customModules = await dbGetAll('customModules');
+    for (const mod of customModules) {
+      const items = await dbGetAll('customItems');
+      items.filter(function(t) { return t.date === today && t.moduleId === mod.id; }).forEach(function(t) {
+        allTasks.push({ module: mod.name, content: t.content || '任务', duration: 30, type: 'custom' });
+      });
+    }
+    // 已有今日计划任务
+    const existingTasks = await dbGetAll('tasks');
+    const existingToday = existingTasks.filter(function(t) { return t.date === today; });
+
+    if (allTasks.length === 0 && existingToday.length === 0) {
+      showToast('今天各模块还没有任务，先生成学习/健身计划吧', 'warning');
+      if (btn) { btn.disabled = false; btn.textContent = '生成今日排程'; }
+      return;
+    }
+
+    // 2. 调用 AI 生成排程
+    const taskListText = allTasks.map(function(t, i) {
+      return (i+1) + '. [' + t.module + '] ' + t.content + '（约' + t.duration + '分钟）';
+    }).join('\n');
+    const existingText = existingToday.map(function(t) {
+      return '- ' + t.content + (t.completed ? '（已完成）' : '');
+    }).join('\n');
+
+    const prompt = `你是一个时间管理专家。请根据用户今天的任务清单，生成一份最优的今日时间安排。
+
+【今日各模块任务】
+${taskListText || '（无）'}
+
+【已有今日计划】
+${existingText || '（无）'}
+
+【重要】你的回复必须是纯JSON数组，不能包含任何其他文字、解释或markdown标记。直接以[开头，以]结尾。
+
+JSON格式：
+[{"time":"08:00","content":"英语听力练习","priority":"high","duration":30,"module":"英语学习"},{"time":"09:00","content":"胸部训练","priority":"normal","duration":60,"module":"运动健身"}]
+
+规则：
+1. time格式为HH:MM，从早上8点到晚上10点之间安排
+2. priority只能是high、normal、low
+3. duration单位分钟
+4. 合理安排任务顺序和间隔，避免时间冲突
+5. 已完成的任务不要重复安排
+6. 只返回JSON数组，不要任何其他内容`;
+
+    const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
+    const schedule = parseScheduleFromText(reply);
+    if (!schedule || schedule.length === 0) {
+      console.log('AI原始回复:', reply);
+      openModal({
+        title: 'AI 返回内容（无法自动解析）',
+        bodyHTML: '<div style="max-height:400px;overflow-y:auto;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">' + escapeHtml(reply) + '</div>',
+        buttons: [{ text: '知道了', close: true }]
+      });
+      if (btn) { btn.disabled = false; btn.textContent = '生成今日排程'; }
+      return;
+    }
+
+    // 3. 清空今天旧的 AI 排程任务（保留手动添加的）
+    const oldAiTasks = existingToday.filter(function(t) { return t.aiScheduled; });
+    for (const t of oldAiTasks) {
+      await dbDelete('tasks', t.id);
+    }
+
+    // 4. 保存新排程
+    let saved = 0;
+    for (const item of schedule) {
+      await dbAdd('tasks', {
+        id: genId(),
+        date: today,
+        content: (item.time ? '[' + item.time + '] ' : '') + item.content,
+        priority: item.priority || 'normal',
+        completed: false,
+        createdAt: Date.now(),
+        aiScheduled: true,
+        module: item.module || '',
+        duration: item.duration || 30
+      });
+      saved++;
+    }
+
+    showToast('已生成 ' + saved + ' 项今日排程', 'success');
+    loadAndRenderTasks();
+  } catch(e) {
+    console.error('排程生成失败:', e);
+    showToast('排程生成失败：' + (e.message || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '生成今日排程'; }
+  }
+}
+
+// 解析 AI 返回的排程 JSON
+function parseScheduleFromText(reply) {
+  if (!reply) return null;
+  // 尝试直接解析
+  try {
+    const data = JSON.parse(reply.trim());
+    if (Array.isArray(data)) return data;
+    if (data.schedule && Array.isArray(data.schedule)) return data.schedule;
+  } catch(e) {}
+  // 提取 JSON 数组
+  const match = reply.match(/\[[\s\S]*\]/);
+  if (match) {
+    try {
+      const data = JSON.parse(match[0]);
+      if (Array.isArray(data)) return data;
+    } catch(e) {}
+  }
+  // 提取 JSON 对象中的数组
+  const objMatch = reply.match(/\{[\s\S]*\}/);
+  if (objMatch) {
+    try {
+      const data = JSON.parse(objMatch[0]);
+      if (Array.isArray(data)) return data;
+      if (data.schedule && Array.isArray(data.schedule)) return data.schedule;
+    } catch(e) {}
+  }
+  return null;
 }
 
 function renderTaskItem(task) {
