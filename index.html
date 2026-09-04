@@ -2305,6 +2305,47 @@ body::before {
   transform: translateX(20px);
 }
 
+/* ===== Quick Data Modal ===== */
+.quick-data-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.quick-data-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.quick-data-row label {
+  width: 80px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.quick-data-row input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.quick-data-row input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79,195,247,0.1);
+}
+.quick-data-hint {
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+  padding-top: 4px;
+}
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -5097,7 +5138,7 @@ function renderMediaData() {
           '<span class="stat">▶ <b>' + (m.views || 0) + '</b></span>' +
           '<span class="stat">👍 <b>' + (m.likes || 0) + '</b></span>' +
           '<span class="stat">💬 <b>' + (m.comments || 0) + '</b></span>' +
-          '<button class="edit-data-btn">编辑数据</button>' +
+          '<button class="edit-data-btn">快速录入</button>' +
           '</div>';
       }).join('') +
       '</div>';
@@ -5105,12 +5146,11 @@ function renderMediaData() {
     const container = document.getElementById('mediaTabData');
     container.innerHTML = html;
 
-    container.querySelectorAll('.edit-data-btn').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const item = btn.closest('.media-data-item');
+    // 点击视频条目或按钮，打开快速录入
+    container.querySelectorAll('.media-data-item').forEach(function(item) {
+      item.addEventListener('click', function() {
         dbGet('media', item.dataset.id).then(function(m) {
-          if (m) openMediaDataModal(m);
+          if (m) openQuickDataModal(m);
         });
       });
     });
@@ -5121,14 +5161,87 @@ function renderMediaData() {
   });
 }
 
+// ===== 快速数据录入浮窗 =====
+function openQuickDataModal(mediaItem) {
+  openModal({
+    title: '📊 快速录入数据 - ' + mediaItem.title.slice(0, 20),
+    bodyHTML:
+      '<div class="quick-data-form">' +
+        '<div class="quick-data-row">' +
+          '<label>▶ 播放量</label>' +
+          '<input type="text" id="quickViews" value="' + (mediaItem.views || 0) + '" placeholder="支持1.2万格式">' +
+        '</div>' +
+        '<div class="quick-data-row">' +
+          '<label>👍 点赞数</label>' +
+          '<input type="text" id="quickLikes" value="' + (mediaItem.likes || 0) + '" placeholder="支持3000格式">' +
+        '</div>' +
+        '<div class="quick-data-row">' +
+          '<label>💬 评论数</label>' +
+          '<input type="text" id="quickComments" value="' + (mediaItem.comments || 0) + '" placeholder="支持500格式">' +
+        '</div>' +
+        '<div class="quick-data-hint">💡 支持中文数字：1.2万 = 12000，3千 = 3000</div>' +
+      '</div>',
+    confirmText: '保存数据',
+    onConfirm: function() {
+      const views = parseChineseNumber(document.getElementById('quickViews').value);
+      const likes = parseChineseNumber(document.getElementById('quickLikes').value);
+      const comments = parseChineseNumber(document.getElementById('quickComments').value);
+      mediaItem.views = views;
+      mediaItem.likes = likes;
+      mediaItem.comments = comments;
+      mediaItem.updatedAt = Date.now();
+      dbPut('media', mediaItem).then(function() {
+        refreshMediaCurrentTab();
+        showToast('数据已保存：播放' + views + ' / 点赞' + likes + ' / 评论' + comments, 'success');
+      });
+      return true;
+    }
+  });
+
+  // 回车快速保存
+  setTimeout(function() {
+    ['quickViews', 'quickLikes', 'quickComments'].forEach(function(id) {
+      const input = document.getElementById(id);
+      if (input) {
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            document.getElementById('modalConfirm').click();
+          }
+        });
+        // 选中时全选，方便直接输入
+        input.addEventListener('focus', function() { this.select(); });
+      }
+    });
+    // 自动聚焦第一个输入框
+    const firstInput = document.getElementById('quickViews');
+    if (firstInput) firstInput.focus();
+  }, 100);
+}
+
 // ===== 抖音分享智能导入 =====
+function parseChineseNumber(text) {
+  // 解析中文数字，如"1.2万" -> 12000, "3000" -> 3000
+  if (!text) return 0;
+  text = text.replace(/,/g, '').trim();
+  const wanMatch = text.match(/([\d.]+)\s*万/);
+  if (wanMatch) return Math.round(parseFloat(wanMatch[1]) * 10000);
+  const qianMatch = text.match(/([\d.]+)\s*千/);
+  if (qianMatch) return Math.round(parseFloat(qianMatch[1]) * 1000);
+  const numMatch = text.match(/([\d.]+)/);
+  if (numMatch) return Math.round(parseFloat(numMatch[1]));
+  return 0;
+}
+
 function parseDouyinShare(text) {
   const result = {
     title: '',
     tags: [],
     url: '',
     publishDate: null,
-    platform: '抖音'
+    platform: '抖音',
+    views: 0,
+    likes: 0,
+    comments: 0
   };
 
   // 提取URL
@@ -5141,6 +5254,18 @@ function parseDouyinShare(text) {
     result.tags = tagMatches.map(function(t) { return t.replace(/^#/, ''); });
   }
 
+  // 提取播放量（支持多种格式）
+  const viewsMatch = text.match(/([\d.]+万?|[\d.]+千?|[\d,]+)\s*(?:次)?播放(?:量)?/) || text.match(/播放(?:量)?[:：]?\s*([\d.]+万?|[\d.]+千?|[\d,]+)/);
+  if (viewsMatch) result.views = parseChineseNumber(viewsMatch[1]);
+
+  // 提取点赞数
+  const likesMatch = text.match(/([\d.]+万?|[\d.]+千?|[\d,]+)\s*(?:个)?(?:赞|点赞)(?:数)?/) || text.match(/(?:点赞|赞)(?:数)?[:：]?\s*([\d.]+万?|[\d.]+千?|[\d,]+)/);
+  if (likesMatch) result.likes = parseChineseNumber(likesMatch[1]);
+
+  // 提取评论数
+  const commentsMatch = text.match(/([\d.]+万?|[\d.]+千?|[\d,]+)\s*(?:条)?(?:评论|评论数)(?:数)?/) || text.match(/(?:评论|评论数)(?:数)?[:：]?\s*([\d.]+万?|[\d.]+千?|[\d,]+)/);
+  if (commentsMatch) result.comments = parseChineseNumber(commentsMatch[1]);
+
   // 提取日期（如7.15、03/15、2024-07-15等）- 在清理之前提取
   const dateMatch = text.match(/(\d{1,2})[.\/](\d{1,2})/);
   if (dateMatch) {
@@ -5152,10 +5277,16 @@ function parseDouyinShare(text) {
     }
   }
 
-  // 移除URL、标签、抖音口令、复制提示等
+  // 移除URL、标签、数据、抖音口令、复制提示等
   let cleanText = text
     .replace(/https?:\/\/[^\s]+/g, '')  // 移除URL
     .replace(/#[^\s#]+/g, '')            // 移除标签
+    .replace(/([\d.]+万?|[\d.]+千?|[\d,]+)\s*(?:次)?播放(?:量)?/g, '')  // 移除播放量
+    .replace(/播放(?:量)?[:：]?\s*([\d.]+万?|[\d.]+千?|[\d,]+)/g, '')
+    .replace(/([\d.]+万?|[\d.]+千?|[\d,]+)\s*(?:个)?(?:赞|点赞)(?:数)?/g, '')  // 移除点赞
+    .replace(/(?:点赞|赞)(?:数)?[:：]?\s*([\d.]+万?|[\d.]+千?|[\d,]+)/g, '')
+    .replace(/([\d.]+万?|[\d.]+千?|[\d,]+)\s*(?:条)?(?:评论|评论数)(?:数)?/g, '')  // 移除评论
+    .replace(/(?:评论|评论数)(?:数)?[:：]?\s*([\d.]+万?|[\d.]+千?|[\d,]+)/g, '')
     .replace(/复制此链接[^\n]*/g, '')     // 移除复制提示
     .replace(/打开Dou音搜索[^\n]*/g, '')  // 移除抖音搜索提示
     .replace(/直接观看视频[^\n]*/g, '')    // 移除观看提示
@@ -5217,9 +5348,9 @@ function openDouyinImportModal() {
         platform: parsed.platform,
         idea: parsed.tags.length > 0 ? '标签：' + parsed.tags.join('、') : '',
         notes: parsed.url ? '视频链接：' + parsed.url : '',
-        views: 0,
-        likes: 0,
-        comments: 0,
+        views: parsed.views || 0,
+        likes: parsed.likes || 0,
+        comments: parsed.comments || 0,
         tags: parsed.tags,
         videoUrl: parsed.url,
         createdAt: Date.now(),
@@ -5249,6 +5380,9 @@ function openDouyinImportModal() {
         '<div><b>日期：</b>' + (parsed.publishDate || '（未解析出）') + '</div>' +
         '<div><b>平台：</b>' + parsed.platform + '</div>' +
         '<div><b>标签：</b>' + (parsed.tags.length > 0 ? parsed.tags.map(function(t) { return '#' + t; }).join(' ') : '（无）') + '</div>' +
+        '<div><b>播放量：</b>' + (parsed.views || 0) + '</div>' +
+        '<div><b>点赞：</b>' + (parsed.likes || 0) + '</div>' +
+        '<div><b>评论：</b>' + (parsed.comments || 0) + '</div>' +
         '<div><b>链接：</b>' + (parsed.url ? escapeHtml(parsed.url) : '（无）') + '</div>';
     };
   }, 100);
