@@ -9980,6 +9980,11 @@ async function callDoubaoApi(messages) {
   return msg.content;
 }
 
+// callAiApi 是 callDoubaoApi 的别名，保持兼容
+async function callAiApi(messages) {
+  return callDoubaoApi(messages);
+}
+
 async function sendAiMessage(text) {
   if (!text.trim()) return;
   if (!aiApiKey) {
