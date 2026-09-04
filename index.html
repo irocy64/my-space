@@ -8191,6 +8191,10 @@ function importAllData(file) {
         try {
           const data = JSON.parse(e.target.result);
           if (!data.stores) throw new Error('无效的备份文件格式');
+          // 版本检查
+          if (data.version && data.version !== '1.0.0') {
+            showToast('警告：备份文件版本 ' + data.version + ' 与当前版本可能不兼容', 'error');
+          }
           const stores = Object.keys(data.stores);
           let importCount = 0;
           const promises = stores.map(function(storeName) {
