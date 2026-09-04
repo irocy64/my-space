@@ -5013,6 +5013,131 @@ async function saveEnglishPlanToDB(data) {
   return totalTasks;
 }
 
+// 英语计划预览/编辑界面
+function showEnglishPlanPreview(data, rawReply) {
+  const typeLabels = { vocabulary: '词汇', reading: '阅读', listening: '听力', writing: '写作', speaking: '口语', other: '其他' };
+  let daysHtml = '';
+  data.plan.forEach(function(dayPlan, dayIdx) {
+    const tasksHtml = (dayPlan.tasks || []).map(function(task, tIdx) {
+      return '<div class="eng-task-row" data-day="' + dayIdx + '" data-task="' + tIdx + '" style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">' +
+        '<select class="eng-task-type" style="width:70px;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;">' +
+          Object.keys(typeLabels).map(function(t) { return '<option value="' + t + '"' + (task.type === t ? ' selected' : '') + '>' + typeLabels[t] + '</option>'; }).join('') +
+        '</select>' +
+        '<input type="text" class="eng-task-content" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;" value="' + escapeHtml(task.content || '') + '">' +
+        '<input type="number" class="eng-task-duration" style="width:50px;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;" value="' + (task.duration || 30) + '" placeholder="分钟">' +
+        '<button class="eng-task-del" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:16px;padding:2px 6px;">×</button>' +
+      '</div>';
+    }).join('');
+    daysHtml += '<div class="eng-day-card" data-day="' + dayIdx + '" style="margin-bottom:16px;padding:12px;background:rgba(255,255,255,0.02);border-radius:10px;border:1px solid var(--border);">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+        '<span style="font-weight:600;font-size:14px;">第 ' + (dayIdx + 1) + ' 天</span>' +
+        '<button class="eng-day-del" data-day="' + dayIdx + '" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:12px;">删除整天</button>' +
+      '</div>' +
+      '<div class="eng-tasks-list">' + tasksHtml + '</div>' +
+      '<button class="eng-task-add" data-day="' + dayIdx + '" style="margin-top:8px;padding:4px 12px;font-size:12px;border-radius:6px;border:1px dashed var(--border);background:none;color:var(--text-light);cursor:pointer;">+ 添加任务</button>' +
+    '</div>';
+  });
+  
+  const warning = data.plan.length < 3 ? '<div style="background:rgba(255,165,0,0.1);border:1px solid orange;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:orange;">⚠️ 警告：AI只返回了 ' + data.plan.length + ' 天计划，可能不完整。建议检查AI原始回复或重新生成。</div>' : '';
+  
+  openModal({
+    title: '📚 英语学习计划预览（共' + data.plan.length + '天）',
+    bodyHTML: warning +
+      '<div style="max-height:500px;overflow-y:auto;padding-right:8px;">' + daysHtml + '</div>' +
+      '<div style="margin-top:12px;">' +
+        '<button id="toggleEngRawReply" style="font-size:12px;color:var(--text-light);background:none;border:none;cursor:pointer;text-decoration:underline;">📋 查看AI原始回复（调试用）</button>' +
+        '<div id="engRawReplyContent" style="display:none;margin-top:8px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;">' + escapeHtml(rawReply || '') + '</div>' +
+      '</div>',
+    confirmText: '确认导入',
+    cancelText: '取消',
+    onConfirm: async function() {
+      // 收集修改后的数据
+      const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
+      const scope = modal || document;
+      if (!scope) return true;
+      const newPlan = [];
+      scope.querySelectorAll('.eng-day-card').forEach(function(card) {
+        const dayIdx = parseInt(card.dataset.day);
+        const tasks = [];
+        card.querySelectorAll('.eng-task-row').forEach(function(row) {
+          tasks.push({
+            type: row.querySelector('.eng-task-type').value,
+            content: row.querySelector('.eng-task-content').value,
+            duration: parseInt(row.querySelector('.eng-task-duration').value) || 30
+          });
+        });
+        if (tasks.length > 0) {
+          newPlan.push({ day: newPlan.length + 1, tasks: tasks });
+        }
+      });
+      if (newPlan.length === 0) {
+        showToast('没有可导入的任务', 'error');
+        return false;
+      }
+      const total = await saveEnglishPlanToDB({ plan: newPlan });
+      showToast('已导入 ' + total + ' 个学习任务，覆盖 ' + newPlan.length + ' 天', 'success');
+      renderEnglish();
+      setTimeout(function() { navigateTo('english'); }, 500);
+      return true;
+    }
+  });
+  
+  // 绑定事件
+  setTimeout(function() {
+    const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
+    const scope = modal || document;
+    if (!scope) return;
+    
+    // 查看AI原始回复
+    const toggleBtn = scope.querySelector('#toggleEngRawReply');
+    const rawContent = scope.querySelector('#engRawReplyContent');
+    if (toggleBtn && rawContent) {
+      toggleBtn.addEventListener('click', function() {
+        rawContent.style.display = rawContent.style.display === 'none' ? 'block' : 'none';
+      });
+    }
+    
+    // 删除任务
+    scope.querySelectorAll('.eng-task-del').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.closest('.eng-task-row').remove();
+      });
+    });
+    
+    // 添加任务
+    scope.querySelectorAll('.eng-task-add').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const dayIdx = this.dataset.day;
+        const row = document.createElement('div');
+        row.className = 'eng-task-row';
+        row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+        row.innerHTML = '<select class="eng-task-type" style="width:70px;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;">' +
+          '<option value="vocabulary">词汇</option><option value="reading">阅读</option><option value="listening">听力</option><option value="writing">写作</option><option value="speaking">口语</option><option value="other">其他</option>' +
+        '</select>' +
+        '<input type="text" class="eng-task-content" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;" placeholder="学习内容">' +
+        '<input type="number" class="eng-task-duration" style="width:50px;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;" value="30" placeholder="分钟">' +
+        '<button class="eng-task-del" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:16px;padding:2px 6px;">×</button>';
+        const dayCard = this.closest('.eng-day-card');
+        if (dayCard) dayCard.querySelector('.eng-tasks-list').appendChild(row);
+        row.querySelector('.eng-task-del').addEventListener('click', function() { row.remove(); });
+      });
+    });
+    
+    // 删除整天
+    scope.querySelectorAll('.eng-day-del').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.closest('.eng-day-card').remove();
+        // 重新编号
+        const cards = scope.querySelectorAll('.eng-day-card');
+        cards.forEach(function(card, idx) {
+          const title = card.querySelector('span');
+          if (title) title.textContent = '第 ' + (idx + 1) + ' 天';
+        });
+      });
+    });
+  }, 100);
+}
+
 async function generateEnglishAiPlan(goal, days, hours) {
   if (!aiApiKey) {
     showToast('请先在 AI 助手中配置 API Key', 'error');
@@ -5075,10 +5200,8 @@ JSON格式如下：
       }, 100);
       return;
     }
-    const totalTasks = await saveEnglishPlanToDB(data);
-    showToast('已生成 ' + totalTasks + ' 个学习任务，覆盖 ' + data.plan.length + ' 天', 'success');
-    renderEnglish();
-    setTimeout(function() { navigateTo('english'); }, 800);
+    // 显示预览/编辑界面
+    showEnglishPlanPreview(data, reply);
   } catch(err) {
     console.error('AI计划生成失败', err);
     showToast('生成失败：' + err.message, 'error');
@@ -8664,8 +8787,8 @@ async function saveAiToModule(module, content) {
       // 尝试解析为结构化学习计划
       const planData = parseEnglishPlanFromText(content);
       if (planData && planData.plan && planData.plan.length > 0) {
-        const total = await saveEnglishPlanToDB(planData);
-        showToast('已解析并保存 ' + total + ' 个学习任务到英语模块', 'success');
+        // 显示预览/编辑界面
+        showEnglishPlanPreview(planData, content);
       } else {
         // 不是计划格式，存为一条学习笔记
         await dbAdd('english', {
