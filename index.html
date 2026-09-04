@@ -9104,6 +9104,40 @@ const EXERCISE_LIBRARY = [
   { name: '波比跳', muscle: '全身', sets: '3组×10次', tips: '动作连贯，控制节奏' }
 ];
 
+// ===== 课程提醒 =====
+function checkCourseReminders() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const now = new Date();
+  const day = now.getDay(); // 0=周日, 1-6=周一到周六
+  const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  dbGetAll('schedule').then(function(courses) {
+    courses.forEach(function(course) {
+      if (course.day !== dayNames[day]) return;
+      // 解析课程时间（如 "08:00-09:40"）
+      const timeMatch = course.time && course.time.match(/(\d{1,2}):(\d{2})/);
+      if (!timeMatch) return;
+      const courseStart = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
+      const diff = courseStart - currentTime;
+      // 提前15分钟提醒，且只提醒一次（用localStorage记录）
+      if (diff >= 14 && diff <= 16) {
+        const remindKey = 'course_reminded_' + course.id + '_' + todayStr();
+        if (!localStorage.getItem(remindKey)) {
+          localStorage.setItem(remindKey, '1');
+          new Notification('📚 课程提醒', {
+            body: course.name + ' 将在15分钟后开始\n地点：' + (course.location || '未知') + '\n老师：' + (course.teacher || '未知'),
+            icon: 'icon.jpg'
+          });
+        }
+      }
+    });
+  });
+}
+
+// 每分钟检查一次课程提醒
+setInterval(checkCourseReminders, 60000);
+
 // ===== 操作撤销 =====
 let _lastDeleted = null;
 let _undoTimer = null;
@@ -10130,18 +10164,25 @@ function openAddBookModal(existing) {
         '<option value="reading" ' + (!existing || existing.status === 'reading' ? 'selected' : '') + '>在读</option>' +
         '<option value="finished" ' + (existing && existing.status === 'finished' ? 'selected' : '') + '>已读完</option>' +
       '</select></div>' +
-      (isEdit ? '<div class="form-group"><label>阅读进度 (%)</label><input type="number" id="bookProgressInput" min="0" max="100" value="' + (existing ? (existing.progress || 0) : 0) + '"></div>' : ''),
+      '<div class="form-group" style="display:flex;gap:10px;">' +
+        '<div style="flex:1;"><label>总页数</label><input type="number" id="bookTotalPagesInput" min="0" value="' + (existing ? (existing.totalPages || '') : '') + '" placeholder="如300"></div>' +
+        '<div style="flex:1;"><label>当前页</label><input type="number" id="bookCurrentPageInput" min="0" value="' + (existing ? (existing.currentPage || '') : '') + '" placeholder="如150"></div>' +
+      '</div>',
     onConfirm: function() {
       const title = document.getElementById('bookTitleInput').value.trim();
       const author = document.getElementById('bookAuthorInput').value.trim();
       const status = document.getElementById('bookStatusModalSelect').value;
+      const totalPages = parseInt(document.getElementById('bookTotalPagesInput').value) || 0;
+      const currentPage = parseInt(document.getElementById('bookCurrentPageInput').value) || 0;
+      const progress = totalPages > 0 ? Math.min(100, Math.round(currentPage / totalPages * 100)) : (status === 'finished' ? 100 : 0);
       if (!title) { showToast('请输入书名', 'error'); return false; }
       if (isEdit) {
         existing.title = title;
         existing.author = author;
         existing.status = status;
-        const progressInput = document.getElementById('bookProgressInput');
-        if (progressInput) existing.progress = parseInt(progressInput.value) || 0;
+        existing.totalPages = totalPages;
+        existing.currentPage = currentPage;
+        existing.progress = progress;
         existing.updatedAt = Date.now();
         dbPut('books', existing).then(function() {
           if (window._booksCurrentBookId === existing.id) openBookDetail(existing.id);
@@ -10151,7 +10192,7 @@ function openAddBookModal(existing) {
       } else {
         dbAdd('books', {
           id: genId(), title: title, author: author, status: status,
-          progress: 0, totalPages: null, currentPage: null, rating: null,
+          progress: progress, totalPages: totalPages, currentPage: currentPage, rating: null,
           createdAt: Date.now(), updatedAt: Date.now()
         }).then(function() {
           window._booksCurrentStatus = status;
