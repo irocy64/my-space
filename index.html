@@ -2346,6 +2346,37 @@ body::before {
   padding-top: 4px;
 }
 
+/* ===== AI Meal Plan ===== */
+.ai-meal-plan-card {
+  background: var(--card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.ai-meal-plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ai-meal-item {
+  background: rgba(100,255,218,0.05);
+  border: 1px solid rgba(100,255,218,0.15);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.ai-meal-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ai-meal-foods {
+  font-size: 13px;
+  color: var(--text-light);
+  line-height: 1.6;
+}
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -8432,6 +8463,14 @@ function renderMeals() {
       '<div class="calorie-nums"><span class="consumed" id="mealsConsumed">0 kcal</span><span class="target" id="mealsTargetText">目标 2000 kcal</span></div>' +
       '<div class="progress-bar"><div class="progress-fill" id="mealsProgressFill" style="width:0%;background:var(--c-meals);"></div></div>' +
     '</div>' +
+    '<div class="ai-meal-plan-card" id="aiMealPlanCard">' +
+      '<div class="ai-meal-plan-header">' +
+        '<span style="font-size:15px;font-weight:600;">🤖 AI 饮食计划</span>' +
+        '<button class="btn-primary" id="aiMealPlanBtn" style="padding:6px 14px;font-size:12px;">生成今日计划</button>' +
+      '</div>' +
+      '<div class="ai-meal-plan-hint" style="font-size:12px;color:var(--text-light);margin-top:6px;">根据目标热量，AI自动搭配早中晚餐</div>' +
+      '<div id="aiMealPlanResult" style="display:none;margin-top:12px;"></div>' +
+    '</div>' +
     '<div class="meals-week-calendar" id="mealsWeekCalendar"></div>' +
     '<div class="meal-cards" id="mealsCards"></div>';
 
@@ -8470,8 +8509,115 @@ function renderMeals() {
   loadMeals();
   loadMealsWeekCalendar();
 
+  // AI饮食计划按钮
+  const aiMealBtn = document.getElementById('aiMealPlanBtn');
+  if (aiMealBtn) aiMealBtn.onclick = generateAiMealPlan;
+
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.onclick = function() { openMealModal('breakfast'); };
+}
+
+// ===== AI饮食计划生成 =====
+function generateAiMealPlan() {
+  if (!aiApiKey) { showToast('请先在设置中配置API Key', 'error'); return; }
+  const target = parseInt(document.getElementById('mealsTargetInput').value) || 2000;
+  const btn = document.getElementById('aiMealPlanBtn');
+  const resultDiv = document.getElementById('aiMealPlanResult');
+
+  btn.textContent = '生成中...';
+  btn.disabled = true;
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-light);">🤖 AI正在为你搭配饮食...</div>';
+
+  const prompt = `你是一个专业营养师。请为用户制定一份每日饮食计划。
+目标每日总热量：${target} kcal
+
+要求：
+1. 分为早餐、午餐、晚餐、加餐四餐
+2. 每餐给出具体食物名称和大概份量
+3. 每餐估算热量，四餐总和接近目标热量
+4. 食物搭配要营养均衡，适合中国饮食习惯
+5. 直接输出JSON格式，不要有其他解释
+
+JSON格式：
+{"breakfast":{"foods":"食物描述","calories":热量},"lunch":{"foods":"食物描述","calories":热量},"dinner":{"foods":"食物描述","calories":热量},"snack":{"foods":"食物描述","calories":热量}}`;
+
+  callDoubaoApi([{ role: 'user', content: prompt }]).then(function(reply) {
+    // 解析JSON
+    let plan = null;
+    const jsonMatch = reply.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try { plan = JSON.parse(jsonMatch[0]); } catch(e) { plan = null; }
+    }
+
+    if (!plan) {
+      resultDiv.innerHTML = '<div style="color:#ff5252;padding:10px;">解析失败，请重试</div>';
+      btn.textContent = '重新生成';
+      btn.disabled = false;
+      return;
+    }
+
+    // 显示计划
+    const mealLabels = { breakfast: '🌅 早餐', lunch: '☀️ 午餐', dinner: '🌙 晚餐', snack: '🍎 加餐' };
+    let totalCal = 0;
+    let html = '';
+    ['breakfast', 'lunch', 'dinner', 'snack'].forEach(function(type) {
+      if (plan[type] && plan[type].foods) {
+        totalCal += plan[type].calories || 0;
+        html += '<div class="ai-meal-item" data-type="' + type + '">' +
+          '<div class="ai-meal-title">' + mealLabels[type] + ' <span style="color:var(--c-meals);font-size:13px;">' + (plan[type].calories || 0) + ' kcal</span></div>' +
+          '<div class="ai-meal-foods">' + escapeHtml(plan[type].foods) + '</div>' +
+          '<button class="btn ai-meal-import-btn" data-type="' + type + '" style="margin-top:6px;padding:4px 10px;font-size:11px;">+ 导入此餐</button>' +
+        '</div>';
+      }
+    });
+
+    html = '<div style="margin-bottom:10px;font-size:13px;color:var(--text-light);">📊 计划总热量：约 <b style="color:var(--c-meals);">' + totalCal + ' kcal</b>（目标 ' + target + ' kcal）</div>' + html +
+      '<button class="btn-primary" id="importAllMealsBtn" style="width:100%;margin-top:12px;padding:8px;font-size:13px;">📥 一键导入全部四餐</button>';
+
+    resultDiv.innerHTML = html;
+    btn.textContent = '重新生成';
+    btn.disabled = false;
+
+    // 绑定导入按钮
+    resultDiv.querySelectorAll('.ai-meal-import-btn').forEach(function(ibtn) {
+      ibtn.onclick = function() {
+        const type = ibtn.dataset.type;
+        if (plan[type]) {
+          importMealPlan(type, plan[type]);
+        }
+      };
+    });
+    document.getElementById('importAllMealsBtn').onclick = function() {
+      ['breakfast', 'lunch', 'dinner', 'snack'].forEach(function(type) {
+        if (plan[type] && plan[type].foods) {
+          importMealPlan(type, plan[type]);
+        }
+      });
+      showToast('已导入全部四餐到饮食记录', 'success');
+      setTimeout(function() { loadMeals(); }, 500);
+    };
+  }).catch(function(err) {
+    resultDiv.innerHTML = '<div style="color:#ff5252;padding:10px;">生成失败：' + escapeHtml(err.message) + '</div>';
+    btn.textContent = '重新生成';
+    btn.disabled = false;
+  });
+}
+
+function importMealPlan(mealType, mealData) {
+  const record = {
+    id: genId(),
+    date: window._mealsSelectedDate || todayStr(),
+    mealType: mealType,
+    foods: mealData.foods,
+    calories: mealData.calories || 0,
+    aiGenerated: true,
+    createdAt: Date.now()
+  };
+  dbAdd('meals', record).then(function() {
+    loadMeals();
+    showToast('已导入' + ({breakfast:'早餐',lunch:'午餐',dinner:'晚餐',snack:'加餐'}[mealType]), 'success');
+  });
 }
 
 function loadMealsWeekCalendar() {
@@ -8621,7 +8767,9 @@ function openMealModal(mealType, existing) {
       title: (isEdit ? '编辑' : '添加') + mealLabels[mealType],
       bodyHTML:
         '<div class="form-group"><label>食物描述</label>' +
-        '<textarea id="mealFoodsInput" placeholder="例如：燕麦粥 + 鸡蛋2个 + 牛奶">' + (existing ? escapeHtml(existing.foods) : '') + '</textarea></div>' +
+        '<textarea id="mealFoodsInput" placeholder="例如：燕麦粥 + 鸡蛋2个 + 牛奶">' + (existing ? escapeHtml(existing.foods) : '') + '</textarea>' +
+        '<div id="mealCalEstimate" style="margin-top:8px;padding:10px;background:rgba(100,255,218,0.08);border-radius:6px;border:1px solid rgba(100,255,218,0.2);display:none;font-size:13px;"></div>' +
+        '</div>' +
         '<div class="form-group"><label>热量 (kcal)</label>' +
         '<input type="number" id="mealCalInput" placeholder="估算热量" min="0" value="' + (existing ? existing.calories : '') + '"></div>' +
         commonHtml,
@@ -8652,8 +8800,42 @@ function openMealModal(mealType, existing) {
         btn.addEventListener('click', function() {
           document.getElementById('mealFoodsInput').value = btn.dataset.foods;
           document.getElementById('mealCalInput').value = btn.dataset.cal;
+          updateMealEstimate();
         });
       });
+
+      // 食物输入时自动估算热量
+      const foodsInput = document.getElementById('mealFoodsInput');
+      const calInput = document.getElementById('mealCalInput');
+      const estimateDiv = document.getElementById('mealCalEstimate');
+
+      function updateMealEstimate() {
+        const text = foodsInput.value.trim();
+        if (!text) { estimateDiv.style.display = 'none'; return; }
+        const result = estimateCalories(text);
+        if (result.items.length > 0) {
+          estimateDiv.style.display = 'block';
+          estimateDiv.innerHTML = '<div style="font-weight:600;color:var(--c-meals);margin-bottom:4px;">🔍 智能估算：约 ' + result.total + ' kcal</div>' +
+            '<div style="color:var(--text-light);font-size:12px;">' +
+            result.items.map(function(i) { return i.name + '(' + i.gram + 'g)=' + i.cal + 'kcal'; }).join(' + ') +
+            '</div>' +
+            '<button type="button" id="applyEstimateBtn" style="margin-top:6px;padding:4px 12px;font-size:12px;background:var(--c-meals);color:#000;border:none;border-radius:4px;cursor:pointer;">应用此估算值</button>';
+          // 如果用户没有手动输入热量，自动填充
+          if (!calInput.value) {
+            calInput.value = result.total;
+          }
+          document.getElementById('applyEstimateBtn').onclick = function() {
+            calInput.value = result.total;
+            showToast('已应用估算值 ' + result.total + ' kcal', 'success');
+          };
+        } else {
+          estimateDiv.style.display = 'none';
+        }
+      }
+
+      foodsInput.addEventListener('input', updateMealEstimate);
+      // 初始检查
+      if (foodsInput.value) updateMealEstimate();
     }, 50);
   });
 }
@@ -8662,6 +8844,107 @@ function editMeal(id) {
   dbGet('meals', id).then(function(meal) {
     if (meal) openMealModal(meal.mealType, meal);
   });
+}
+
+// ===== 食物热量数据库 =====
+const FOOD_CALORIE_DB = [
+  // 主食
+  { name: '米饭', aliases: ['白米饭', '大米饭'], calPer100g: 116, defaultGram: 150 },
+  { name: '面条', aliases: ['挂面', '汤面', '拌面'], calPer100g: 110, defaultGram: 200 },
+  { name: '馒头', aliases: ['白馒头'], calPer100g: 223, defaultGram: 100 },
+  { name: '包子', aliases: ['肉包', '菜包'], calPer100g: 227, defaultGram: 100 },
+  { name: '饺子', aliases: ['水饺', '蒸饺'], calPer100g: 253, defaultGram: 200 },
+  { name: '粥', aliases: ['白粥', '大米粥'], calPer100g: 46, defaultGram: 300 },
+  { name: '燕麦', aliases: ['燕麦片', '燕麦粥'], calPer100g: 377, defaultGram: 40 },
+  { name: '红薯', aliases: ['地瓜', '番薯'], calPer100g: 86, defaultGram: 200 },
+  { name: '玉米', aliases: ['甜玉米', '糯玉米'], calPer100g: 112, defaultGram: 200 },
+  { name: '面包', aliases: ['吐司', '全麦面包'], calPer100g: 313, defaultGram: 60 },
+  // 蛋白质
+  { name: '鸡蛋', aliases: ['水煮蛋', '煎蛋', '蒸蛋'], calPer100g: 144, defaultGram: 50 },
+  { name: '鸡胸肉', aliases: ['鸡胸', '水煮鸡胸'], calPer100g: 133, defaultGram: 150 },
+  { name: '鸡腿', aliases: ['琵琶腿', '卤鸡腿'], calPer100g: 181, defaultGram: 150 },
+  { name: '牛肉', aliases: ['酱牛肉', '卤牛肉', '牛排'], calPer100g: 125, defaultGram: 150 },
+  { name: '猪肉', aliases: ['红烧肉', '回锅肉', '瘦肉'], calPer100g: 395, defaultGram: 100 },
+  { name: '鱼', aliases: ['草鱼', '鲈鱼', '清蒸鱼', '烤鱼'], calPer100g: 113, defaultGram: 150 },
+  { name: '虾', aliases: ['基围虾', '白灼虾', '虾仁'], calPer100g: 93, defaultGram: 100 },
+  { name: '豆腐', aliases: ['嫩豆腐', '老豆腐', '麻婆豆腐'], calPer100g: 81, defaultGram: 150 },
+  { name: '牛奶', aliases: ['纯牛奶', '鲜牛奶'], calPer100g: 54, defaultGram: 250 },
+  { name: '酸奶', aliases: ['原味酸奶'], calPer100g: 72, defaultGram: 150 },
+  { name: '豆浆', aliases: ['黄豆浆', '黑豆浆'], calPer100g: 31, defaultGram: 300 },
+  // 蔬菜
+  { name: '西兰花', aliases: ['西蓝花'], calPer100g: 36, defaultGram: 150 },
+  { name: '青菜', aliases: ['小白菜', '上海青', '油麦菜'], calPer100g: 15, defaultGram: 200 },
+  { name: '番茄', aliases: ['西红柿'], calPer100g: 18, defaultGram: 150 },
+  { name: '黄瓜', aliases: ['青瓜'], calPer100g: 16, defaultGram: 150 },
+  { name: '胡萝卜', aliases: ['红萝卜'], calPer100g: 37, defaultGram: 100 },
+  { name: '土豆', aliases: ['马铃薯', '土豆丝'], calPer100g: 77, defaultGram: 150 },
+  { name: '茄子', aliases: ['红烧茄子', '蒸茄子'], calPer100g: 23, defaultGram: 150 },
+  // 水果
+  { name: '苹果', aliases: ['红富士', '青苹果'], calPer100g: 53, defaultGram: 200 },
+  { name: '香蕉', aliases: ['芭蕉'], calPer100g: 91, defaultGram: 120 },
+  { name: '橙子', aliases: ['脐橙', '橘子', '桔子'], calPer100g: 48, defaultGram: 150 },
+  { name: '葡萄', aliases: ['提子', '巨峰葡萄'], calPer100g: 45, defaultGram: 100 },
+  { name: '西瓜', aliases: [], calPer100g: 26, defaultGram: 300 },
+  // 饮品零食
+  { name: '咖啡', aliases: ['黑咖啡', '美式'], calPer100g: 2, defaultGram: 300 },
+  { name: '奶茶', aliases: ['珍珠奶茶', '果茶'], calPer100g: 52, defaultGram: 500 },
+  { name: '可乐', aliases: ['汽水', '碳酸饮料'], calPer100g: 43, defaultGram: 330 },
+  { name: '坚果', aliases: ['核桃', '杏仁', '巴旦木', '腰果'], calPer100g: 607, defaultGram: 30 },
+  { name: '巧克力', aliases: ['黑巧克力'], calPer100g: 586, defaultGram: 30 },
+  { name: '薯片', aliases: ['薯条', '膨化食品'], calPer100g: 547, defaultGram: 50 }
+];
+
+function estimateCalories(foodText) {
+  // 解析食物描述，估算总热量
+  if (!foodText) return { total: 0, items: [] };
+  const items = [];
+  let total = 0;
+
+  // 按常见分隔符拆分
+  const parts = foodText.split(/[+＋、,，\n]/).map(function(s) { return s.trim(); }).filter(Boolean);
+
+  parts.forEach(function(part) {
+    let matched = null;
+    let gram = null;
+
+    // 提取数量（如 "2个"、"150g"、"一碗"）
+    const numMatch = part.match(/(\d+(?:\.\d+)?)\s*(个|碗|杯|份|根|片|块|g|克|kg|千克)/);
+    if (numMatch) {
+      const num = parseFloat(numMatch[1]);
+      const unit = numMatch[2];
+      if (unit === 'g' || unit === '克') gram = num;
+      else if (unit === 'kg' || unit === '千克') gram = num * 1000;
+      else if (unit === '个') gram = num * 50; // 默认每个50g
+      else if (unit === '碗') gram = num * 200;
+      else if (unit === '杯') gram = num * 250;
+      else if (unit === '份') gram = num * 150;
+      else if (unit === '根') gram = num * 100;
+      else if (unit === '片') gram = num * 30;
+      else if (unit === '块') gram = num * 50;
+    }
+
+    // 匹配食物
+    for (let i = 0; i < FOOD_CALORIE_DB.length; i++) {
+      const food = FOOD_CALORIE_DB[i];
+      const allNames = [food.name].concat(food.aliases);
+      for (let j = 0; j < allNames.length; j++) {
+        if (part.includes(allNames[j])) {
+          matched = food;
+          break;
+        }
+      }
+      if (matched) break;
+    }
+
+    if (matched) {
+      const useGram = gram || matched.defaultGram;
+      const cal = Math.round((matched.calPer100g * useGram) / 100);
+      total += cal;
+      items.push({ name: matched.name, gram: useGram, cal: cal });
+    }
+  });
+
+  return { total: total, items: items };
 }
 
 function deleteMeal(id) {
