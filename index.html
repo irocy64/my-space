@@ -2393,6 +2393,15 @@ body::before {
   .ai-quick-btn { flex: 1 1 45%; font-size: 11px; padding: 8px 6px; }
 }
 </style>
+<script>
+  // 页面渲染前应用主题，避免闪烁
+  (function() {
+    try {
+      var theme = localStorage.getItem('theme') || 'dark';
+      if (theme === 'light') document.documentElement.classList.add('light-theme');
+    } catch(e) {}
+  })();
+</script>
 </head>
 <body>
 
@@ -7976,8 +7985,10 @@ function renderSettings() {
   function applyTheme(theme) {
     if (theme === 'light') {
       document.body.classList.add('light-theme');
+      document.documentElement.classList.add('light-theme');
     } else {
       document.body.classList.remove('light-theme');
+      document.documentElement.classList.remove('light-theme');
     }
     localStorage.setItem('theme', theme);
   }
