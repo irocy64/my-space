@@ -5074,7 +5074,11 @@ function renderMediaData() {
     const recent = published.slice(0, 7);
     const maxViews = Math.max.apply(null, recent.map(function(m) { return m.views || 0; }).concat([1]));
 
-    let html = '<div class="media-chart-card">' +
+    let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+      '<div style="font-size:16px;font-weight:600;">📊 数据看板</div>' +
+      '<button class="btn-primary" id="mediaImportBtn" style="padding:8px 16px;font-size:13px;">📥 抖音分享导入</button>' +
+    '</div>' +
+    '<div class="media-chart-card">' +
       '<div class="chart-title">📈 最近发布视频播放量</div>' +
       (recent.length === 0 ? '<div class="empty-state">还没有已发布的视频</div>' :
       '<div class="media-chart">' + recent.map(function(m) {
@@ -5110,7 +5114,144 @@ function renderMediaData() {
         });
       });
     });
+
+    // 抖音分享导入按钮
+    const importBtn = document.getElementById('mediaImportBtn');
+    if (importBtn) importBtn.onclick = openDouyinImportModal;
   });
+}
+
+// ===== 抖音分享智能导入 =====
+function parseDouyinShare(text) {
+  const result = {
+    title: '',
+    tags: [],
+    url: '',
+    publishDate: null,
+    platform: '抖音'
+  };
+
+  // 提取URL
+  const urlMatch = text.match(/https?:\/\/[^\s]+/);
+  if (urlMatch) result.url = urlMatch[0];
+
+  // 提取标签（#开头）
+  const tagMatches = text.match(/#[^\s#]+/g);
+  if (tagMatches) {
+    result.tags = tagMatches.map(function(t) { return t.replace(/^#/, ''); });
+  }
+
+  // 提取日期（如7.15、03/15、2024-07-15等）- 在清理之前提取
+  const dateMatch = text.match(/(\d{1,2})[.\/](\d{1,2})/);
+  if (dateMatch) {
+    const month = parseInt(dateMatch[1]);
+    const day = parseInt(dateMatch[2]);
+    const year = new Date().getFullYear();
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      result.publishDate = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    }
+  }
+
+  // 移除URL、标签、抖音口令、复制提示等
+  let cleanText = text
+    .replace(/https?:\/\/[^\s]+/g, '')  // 移除URL
+    .replace(/#[^\s#]+/g, '')            // 移除标签
+    .replace(/复制此链接[^\n]*/g, '')     // 移除复制提示
+    .replace(/打开Dou音搜索[^\n]*/g, '')  // 移除抖音搜索提示
+    .replace(/直接观看视频[^\n]*/g, '')    // 移除观看提示
+    .replace(/[A-Za-z0-9]+:\/\/[^\s]*/g, '')  // 移除类似口令的URL格式
+    .replace(/\b[A-Za-z0-9]{2,}[:\/][A-Za-z0-9@.\/_-]+\b/g, '')  // 移除抖音口令（如RXZ:/ J@V.LW）
+    .replace(/\b[A-Za-z0-9@.]{3,}\.[A-Za-z0-9]{2,}\b/g, '')  // 移除类似J@V.LW的口令
+    .replace(/\b\d{2,}\/\d{2,}\b/g, '')   // 移除类似03/15的口令片段
+    .replace(/\d{1,2}(am|pm|AM|PM)/g, '')  // 移除时间（如9pm）
+    .replace(/\d{1,2}:\d{2}/g, '')         // 移除时间（如21:00）
+    .replace(/(早上|上午|中午|下午|晚上|凌晨)\d{1,2}点/g, '')  // 移除中文时间
+    .replace(/(\d{1,2})[.\/](\d{1,2})/g, '')  // 移除日期
+    .trim();
+
+  // 按行处理，过滤掉太短或包含太多特殊字符的行（抖音口令）
+  const lines = cleanText.split(/\n+/).map(function(l) { return l.trim(); }).filter(function(l) {
+    if (!l) return false;
+    if (l.length < 2) return false;
+    // 过滤纯特殊字符或字母数字组合的短行（抖音口令）
+    if (/^[A-Za-z0-9@.:\/_\-]{2,15}$/.test(l)) return false;
+    // 过滤包含太多特殊字符的行
+    const specialChars = (l.match(/[@.:\/_\-]/g) || []).length;
+    if (l.length < 20 && specialChars > l.length * 0.3) return false;
+    return true;
+  });
+
+  // 剩下的第一行有意义的文本作为标题
+  if (lines.length > 0) {
+    result.title = lines[0].slice(0, 50);
+  }
+
+  return result;
+}
+
+function openDouyinImportModal() {
+  openModal({
+    title: '📥 抖音分享导入',
+    bodyHTML:
+      '<div class="form-group">' +
+        '<label>粘贴抖音分享文本</label>' +
+        '<textarea id="douyinImportText" rows="6" placeholder="将抖音APP分享的完整文本粘贴到这里...&#10;&#10;示例：&#10;7.15 9pm 123:/ 复制打开抖音&#10;视频标题内容&#10;#标签1 #标签2&#10;https://v.douyin.com/xxxxx/&#10;复制此链接，打开Dou音搜索，直接观看视频！"></textarea>' +
+      '</div>' +
+      '<div id="douyinPreview" style="display:none;margin-top:12px;padding:12px;background:rgba(79,195,247,0.08);border-radius:8px;border:1px solid rgba(79,195,247,0.2);">' +
+        '<div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--primary);">📋 解析预览</div>' +
+        '<div id="douyinPreviewContent" style="font-size:12px;line-height:1.8;color:var(--text-light);"></div>' +
+      '</div>' +
+      '<button class="settings-btn" id="douyinParseBtn" style="margin-top:10px;width:100%;">🔍 解析内容</button>',
+    confirmText: '导入到数据看板',
+    onConfirm: function() {
+      const text = document.getElementById('douyinImportText').value.trim();
+      if (!text) { showToast('请粘贴抖音分享文本', 'error'); return false; }
+      const parsed = parseDouyinShare(text);
+      if (!parsed.title) { showToast('未能解析出视频标题', 'error'); return false; }
+
+      const data = {
+        id: genId(),
+        title: parsed.title,
+        status: 'published',
+        publishDate: parsed.publishDate,
+        platform: parsed.platform,
+        idea: parsed.tags.length > 0 ? '标签：' + parsed.tags.join('、') : '',
+        notes: parsed.url ? '视频链接：' + parsed.url : '',
+        views: 0,
+        likes: 0,
+        comments: 0,
+        tags: parsed.tags,
+        videoUrl: parsed.url,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        imported: true
+      };
+
+      dbAdd('media', data).then(function() {
+        refreshMediaCurrentTab();
+        showToast('已导入到数据看板，记得补充播放量数据', 'success');
+      });
+      return true;
+    }
+  });
+
+  setTimeout(function() {
+    const parseBtn = document.getElementById('douyinParseBtn');
+    if (parseBtn) parseBtn.onclick = function() {
+      const text = document.getElementById('douyinImportText').value.trim();
+      if (!text) { showToast('请先粘贴分享文本', 'error'); return; }
+      const parsed = parseDouyinShare(text);
+      const preview = document.getElementById('douyinPreview');
+      const previewContent = document.getElementById('douyinPreviewContent');
+      preview.style.display = 'block';
+      previewContent.innerHTML =
+        '<div><b>标题：</b>' + escapeHtml(parsed.title || '（未解析出）') + '</div>' +
+        '<div><b>日期：</b>' + (parsed.publishDate || '（未解析出）') + '</div>' +
+        '<div><b>平台：</b>' + parsed.platform + '</div>' +
+        '<div><b>标签：</b>' + (parsed.tags.length > 0 ? parsed.tags.map(function(t) { return '#' + t; }).join(' ') : '（无）') + '</div>' +
+        '<div><b>链接：</b>' + (parsed.url ? escapeHtml(parsed.url) : '（无）') + '</div>';
+    };
+  }, 100);
 }
 
 function openMediaModal(existing, defaultDate) {
@@ -5128,7 +5269,7 @@ function openMediaModal(existing, defaultDate) {
         '<div class="form-group"><label>发布日期</label><input type="date" id="mediaDateInput" value="' + (existing ? (existing.publishDate || '') : (defaultDate || '')) + '"></div>' +
       '</div>' +
       '<div class="form-group"><label>平台</label><input type="text" id="mediaPlatformInput" placeholder="抖音/B站/视频号" value="' + escapeHtml(existing ? (existing.platform || '') : '') + '"></div>' +
-      '<div class="form-group"><label>灵感/大纲</label><textarea id="mediaIdeaInput" placeholder="视频内容大纲...">' + escapeHtml(existing ? (existing.idea || '') : '') + '</textarea></div>' +
+      '<div class="form-group"><label>灵感/大纲</label><textarea id="mediaIdeaInput" rows="10" style="min-height:200px;line-height:1.8;font-size:14px;" placeholder="视频内容大纲...">' + escapeHtml(existing ? (existing.idea || '') : '') + '</textarea></div>' +
       '<div class="form-group"><label>备注</label><textarea id="mediaNotesInput" placeholder="其他备注...">' + escapeHtml(existing ? (existing.notes || '') : '') + '</textarea></div>',
     onConfirm: function() {
       const title = document.getElementById('mediaTitleInput').value.trim();
