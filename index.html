@@ -8442,6 +8442,10 @@ async function sendAiMessage(text) {
   }
   appendAiMessage('user', text);
   aiConversation.push({ role: 'user', content: text });
+  // 限制对话历史长度，最多保留20条（避免token消耗过大）
+  if (aiConversation.length > 20) {
+    aiConversation = aiConversation.slice(-20);
+  }
   document.getElementById('aiInput').value = '';
   document.getElementById('aiSendBtn').disabled = true;
 
@@ -8555,6 +8559,10 @@ async function sendAiMessage(text) {
     // 流式完成，添加保存按钮
     if (fullContent.trim()) {
       aiConversation.push({ role: 'assistant', content: fullContent });
+      // 限制对话历史长度
+      if (aiConversation.length > 20) {
+        aiConversation = aiConversation.slice(-20);
+      }
       saveAiHistory();
       addSaveButtonsToMessage(msgDiv, fullContent);
     } else if (!thinkingContent) {
