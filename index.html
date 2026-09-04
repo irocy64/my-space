@@ -3779,13 +3779,15 @@ async function generateTodaySchedule() {
       allTasks.push({ module: '阅读计划', content: t.content || '阅读', duration: 30, type: 'reading' });
     });
     // 自定义模块任务
-    const customModules = await dbGetAll('customModules');
-    for (const mod of customModules) {
-      const items = await dbGetAll('customItems');
-      items.filter(function(t) { return t.date === today && t.moduleId === mod.id; }).forEach(function(t) {
-        allTasks.push({ module: mod.name, content: t.content || '任务', duration: 30, type: 'custom' });
-      });
-    }
+    try {
+      const customModules = await dbGetAll('customModules');
+      for (const mod of customModules) {
+        const items = await dbGetAll('customItems');
+        items.filter(function(t) { return t.date === today && t.moduleId === mod.id; }).forEach(function(t) {
+          allTasks.push({ module: mod.name, content: t.content || '任务', duration: 30, type: 'custom' });
+        });
+      }
+    } catch(e) { /* customModules store可能不存在，忽略 */ }
     // 已有今日计划任务
     const existingTasks = await dbGetAll('tasks');
     const existingToday = existingTasks.filter(function(t) { return t.date === today; });
