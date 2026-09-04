@@ -41,6 +41,8 @@
 
   --c-home: #4fc3f7;
   --c-tasks: #00e5ff;
+  --c-schedule: #81d4fa;
+  --c-academics: #4dd0e1;
   --c-media: #ffb74d;
   --c-english: #4fc3f7;
   --c-experiments: #b388ff;
@@ -49,6 +51,9 @@
   --c-games: #bcaaa4;
   --c-books: #8c9eff;
   --c-settings: #90a4ae;
+  --c-reagents: #a5d6a7;
+  --c-literature: #ce93d8;
+  --c-focus: #ffab91;
 }
 
 /* 浅色主题 */
@@ -1926,6 +1931,190 @@ body::before {
 }
 .media-data-item .edit-data-btn:hover { border-color: var(--primary); color: var(--primary); }
 
+/* ===== Schedule Module ===== */
+.schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.schedule-header h2 { margin: 0; font-size: 20px; }
+.schedule-actions { display: flex; gap: 8px; }
+.schedule-grid {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+.schedule-time-col, .schedule-day-col {
+  flex: 1;
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.schedule-time-col { min-width: 70px; flex: 0 0 70px; }
+.schedule-cell {
+  min-height: 70px;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.schedule-header-cell {
+  background: var(--card-solid);
+  font-weight: 600;
+  text-align: center;
+  min-height: 40px;
+  color: var(--primary);
+}
+.schedule-time-cell {
+  background: var(--card-solid);
+  text-align: center;
+  color: var(--text-light);
+  min-height: 70px;
+}
+.schedule-empty {
+  background: var(--card);
+  border: 1px dashed var(--border-light);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.schedule-empty:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.schedule-course {
+  border: 1px solid;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.schedule-course:hover { transform: scale(1.02); }
+.course-name { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.course-room { font-size: 11px; color: var(--text-light); }
+.course-teacher { font-size: 11px; color: var(--text-light); }
+.schedule-legend {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+}
+.color-picker {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+.color-dot:hover { transform: scale(1.1); }
+.color-dot.selected { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+
+/* ===== Academics Module ===== */
+.academics-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.academics-tab {
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.academics-tab.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.exam-list { display: flex; flex-direction: column; gap: 12px; }
+.exam-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--card);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.exam-card:hover { transform: translateX(4px); }
+.exam-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.exam-date { font-size: 13px; color: var(--text-light); }
+.exam-countdown {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.exam-countdown.urgent { color: #ff5252; }
+.exam-countdown.passed { color: var(--text-light); font-size: 16px; }
+.gpa-summary {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.gpa-box {
+  flex: 1;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  border: 1px solid var(--border-light);
+}
+.gpa-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+.gpa-label { font-size: 13px; color: var(--text-light); }
+.grade-list { display: flex; flex-direction: column; gap: 10px; }
+.grade-card {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 14px 18px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.grade-card:hover { background: var(--primary-light); }
+.grade-name { font-weight: 600; }
+.grade-score { color: var(--success); font-weight: 600; }
+.grade-credits { color: var(--text-light); font-size: 13px; }
+.grade-gpa { color: var(--primary); font-weight: 600; }
+
+/* ===== Home Exam Countdown ===== */
+.exam-countdown-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.exam-countdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--primary);
+}
+.ecd-name { font-size: 13px; font-weight: 500; }
+.ecd-days { font-size: 18px; font-weight: 700; color: var(--primary); }
+.ecd-days.urgent { color: #ff5252; }
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -2437,6 +2626,8 @@ body::before {
       <!-- 10 pages will be rendered by JS -->
       <div class="page active" id="page-home"></div>
       <div class="page" id="page-tasks"></div>
+      <div class="page" id="page-schedule"></div>
+      <div class="page" id="page-academics"></div>
       <div class="page" id="page-media"></div>
       <div class="page" id="page-english"></div>
       <div class="page" id="page-experiments"></div>
@@ -2481,6 +2672,8 @@ body::before {
 const MODULES = {
   home:        { name: '首页总览',     color: 'var(--c-home)',        hasAddBtn: false, addBtnText: '' },
   tasks:       { name: '今日计划',     color: 'var(--c-tasks)',       hasAddBtn: true,  addBtnText: '新增任务' },
+  schedule:    { name: '课程表',       color: 'var(--c-schedule)',    hasAddBtn: true,  addBtnText: '添加课程' },
+  academics:   { name: '学业管理',     color: 'var(--c-academics)',   hasAddBtn: true,  addBtnText: '添加' },
   media:       { name: '自媒体',       color: 'var(--c-media)',       hasAddBtn: true,  addBtnText: '新增视频' },
   english:     { name: '英语学习计划', color: 'var(--c-english)',     hasAddBtn: true,  addBtnText: '添加学习任务' },
   experiments: { name: '实验工作',     color: 'var(--c-experiments)', hasAddBtn: true,  addBtnText: '新记录' },
@@ -2491,7 +2684,7 @@ const MODULES = {
   settings:    { name: '数据与设置',   color: 'var(--c-settings)',    hasAddBtn: false, addBtnText: '' }
 };
 
-const STORE_NAMES = ['tasks','media','english','experiments','files','workouts','meals','games','gameLogs','books','bookNotes','memo','settings','customItems'];
+const STORE_NAMES = ['tasks','media','english','experiments','files','workouts','meals','games','gameLogs','books','bookNotes','memo','settings','customItems','schedule','academics','reagents','literature','focusSessions'];
 
 // ===== State =====
 let currentPage = 'home';
@@ -2502,7 +2695,7 @@ let moduleConfig = { hiddenModules: [], customModules: [] };
 // ===== 模块配置 =====
 const PRESET_MODULES_ORDER = [
   { category: '日常', ids: ['home','tasks'] },
-  { category: '学习', ids: ['english','books'] },
+  { category: '学习', ids: ['schedule','academics','english','books'] },
   { category: '生活', ids: ['media','experiments','workouts','meals','games'] },
   { category: '系统', ids: ['settings'] }
 ];
@@ -2586,7 +2779,7 @@ function formatFileSize(bytes) {
 // ===== IndexedDB Layer =====
 function initDB() {
   return new Promise(function(resolve, reject) {
-    const req = indexedDB.open('personal-app', 2);
+    const req = indexedDB.open('personal-app', 3);
     req.onupgradeneeded = function(e) {
       const database = e.target.result;
       const stores = {
@@ -2603,7 +2796,12 @@ function initDB() {
         bookNotes:   { keyPath: 'id', indexes: [{name:'bookId', keyPath:'bookId'}] },
         memo:        { keyPath: 'id', indexes: [] },
         settings:    { keyPath: 'id', indexes: [] },
-        customItems: { keyPath: 'id', indexes: [{name:'moduleId', keyPath:'moduleId'},{name:'date', keyPath:'date'}] }
+        customItems: { keyPath: 'id', indexes: [{name:'moduleId', keyPath:'moduleId'},{name:'date', keyPath:'date'}] },
+        schedule:    { keyPath: 'id', indexes: [{name:'day', keyPath:'day'}] },
+        academics:   { keyPath: 'id', indexes: [{name:'type', keyPath:'type'}] },
+        reagents:    { keyPath: 'id', indexes: [] },
+        literature:  { keyPath: 'id', indexes: [] },
+        focusSessions:{ keyPath: 'id', indexes: [{name:'date', keyPath:'date'}] }
       };
       for (const name in stores) {
         if (!database.objectStoreNames.contains(name)) {
@@ -2727,6 +2925,8 @@ function renderPage(pageId) {
   const renderers = {
     home: renderHome,
     tasks: renderTasks,
+    schedule: renderSchedule,
+    academics: renderAcademics,
     media: renderMedia,
     english: renderEnglish,
     experiments: renderExperiments,
@@ -3159,6 +3359,7 @@ function renderHome() {
         '</div>' +
       '</div>' +
     '</div>' +
+    '<div id="homeExamCountdown" style="margin-bottom:16px;"></div>' +
     '<div class="home-section-title" style="margin-bottom:12px;">📊 各模块动态</div>' +
     '<div class="home-summaries" id="homeSummaries"></div>';
 
@@ -3170,6 +3371,7 @@ function renderHome() {
   startHomeDateTime();
   loadHomeProgress();
   loadHomeTimeline();
+  loadExamCountdown();
 
   // 时间线添加事项按钮
   const timelineAddBtn = document.getElementById('homeTimelineAddBtn');
@@ -3409,6 +3611,27 @@ function loadHomeTimeline() {
       });
       item.style.cursor = 'pointer';
     });
+  });
+}
+
+function loadExamCountdown() {
+  const container = document.getElementById('homeExamCountdown');
+  if (!container) return;
+  dbGetAll('academics').then(function(all) {
+    const exams = all.filter(function(i) { return i.type === 'exam'; })
+      .filter(function(e) { return new Date(e.date) >= new Date(todayStr()); })
+      .sort(function(a, b) { return new Date(a.date) - new Date(b.date); })
+      .slice(0, 3);
+    if (exams.length === 0) { container.innerHTML = ''; return; }
+    container.innerHTML = '<div class="exam-countdown-bar">' +
+      exams.map(function(e) {
+        const days = Math.ceil((new Date(e.date) - new Date(todayStr())) / (1000 * 60 * 60 * 24));
+        const urgent = days <= 7;
+        return '<div class="exam-countdown-item" style="border-color:' + (urgent ? '#ff5252' : 'var(--primary)') + ';">' +
+          '<span class="ecd-name">' + escapeHtml(e.name) + '</span>' +
+          '<span class="ecd-days ' + (urgent ? 'urgent' : '') + '">' + (days === 0 ? '今天' : days + '天') + '</span>' +
+        '</div>';
+      }).join('') + '</div>';
   });
 }
 
@@ -4016,6 +4239,334 @@ function deleteTask(id) {
     });
   });
 }
+
+// ===== 课程表模块 =====
+const SCHEDULE_DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
+const SCHEDULE_TIMES = ['08:00','09:50','11:40','14:00','15:50','17:40','19:00'];
+
+function renderSchedule() {
+  const container = document.getElementById('page-schedule');
+  container.innerHTML =
+    '<div class="schedule-header">' +
+      '<h2>📅 课程表</h2>' +
+      '<div class="schedule-actions">' +
+        '<button class="settings-btn" id="syncTodayBtn">📋 同步今日课程到待办</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="schedule-grid" id="scheduleGrid"></div>' +
+    '<div class="schedule-legend">' +
+      '<span>💡 点击课程可编辑/删除</span>' +
+    '</div>';
+
+  const addBtn = document.getElementById('topbarAddBtn');
+  if (addBtn) addBtn.onclick = function() { openCourseModal(); };
+
+  document.getElementById('syncTodayBtn').onclick = syncTodayCoursesToTasks;
+  renderScheduleGrid();
+}
+
+function renderScheduleGrid() {
+  dbGetAll('schedule').then(function(courses) {
+    const grid = document.getElementById('scheduleGrid');
+    let html = '<div class="schedule-time-col"><div class="schedule-cell schedule-header-cell">时间</div>';
+    SCHEDULE_TIMES.forEach(function(t) {
+      html += '<div class="schedule-cell schedule-time-cell">' + t + '</div>';
+    });
+    html += '</div>';
+
+    SCHEDULE_DAYS.forEach(function(day, dayIdx) {
+      html += '<div class="schedule-day-col"><div class="schedule-cell schedule-header-cell">' + day + '</div>';
+      SCHEDULE_TIMES.forEach(function(time) {
+        const course = courses.find(function(c) { return c.day === dayIdx && c.startTime === time; });
+        if (course) {
+          html += '<div class="schedule-cell schedule-course" data-id="' + course.id + '" style="background:' + course.color + '22;border-color:' + course.color + ';">' +
+            '<div class="course-name">' + escapeHtml(course.name) + '</div>' +
+            '<div class="course-room">' + escapeHtml(course.room || '') + '</div>' +
+            '<div class="course-teacher">' + escapeHtml(course.teacher || '') + '</div>' +
+          '</div>';
+        } else {
+          html += '<div class="schedule-cell schedule-empty" data-day="' + dayIdx + '" data-time="' + time + '"></div>';
+        }
+      });
+      html += '</div>';
+    });
+    grid.innerHTML = html;
+
+    grid.querySelectorAll('.schedule-course').forEach(function(el) {
+      el.onclick = function() { openCourseModal(el.dataset.id); };
+    });
+    grid.querySelectorAll('.schedule-empty').forEach(function(el) {
+      el.onclick = function() { openCourseModal(null, parseInt(el.dataset.day), el.dataset.time); };
+    });
+  });
+}
+
+function openCourseModal(courseId, day, time) {
+  let existing = null;
+  const colors = ['#4fc3f7','#ff80ab','#64ffda','#ffb74d','#b388ff','#81c784','#e57373','#4dd0e1'];
+
+  const loadPromise = courseId ? dbGet('schedule', courseId).then(function(c) { existing = c; }) : Promise.resolve();
+  loadPromise.then(function() {
+    openModal({
+      title: existing ? '编辑课程' : '添加课程',
+      bodyHTML:
+        '<div class="form-group"><label>课程名称</label><input type="text" id="courseNameInput" value="' + escapeHtml(existing ? existing.name : '') + '" placeholder="如：分析化学"></div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>星期</label><select id="courseDayInput">' +
+            SCHEDULE_DAYS.map(function(d, i) { return '<option value="' + i + '"' + ((existing ? existing.day : day) === i ? ' selected' : '') + '>' + d + '</option>'; }).join('') +
+          '</select></div>' +
+          '<div class="form-group"><label>开始时间</label><select id="courseStartInput">' +
+            SCHEDULE_TIMES.map(function(t) { return '<option value="' + t + '"' + ((existing ? existing.startTime : time) === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') +
+          '</select></div>' +
+          '<div class="form-group"><label>结束时间</label><select id="courseEndInput">' +
+            SCHEDULE_TIMES.map(function(t) { return '<option value="' + t + '"' + (existing && existing.endTime === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') +
+          '</select></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>教室</label><input type="text" id="courseRoomInput" value="' + escapeHtml(existing ? existing.room || '' : '') + '" placeholder="如：A301"></div>' +
+          '<div class="form-group"><label>老师</label><input type="text" id="courseTeacherInput" value="' + escapeHtml(existing ? existing.teacher || '' : '') + '"></div>' +
+        '</div>' +
+        '<div class="form-group"><label>颜色</label><div class="color-picker">' +
+          colors.map(function(c, i) { return '<div class="color-dot" data-color="' + c + '" style="background:' + c + ';"></div>'; }).join('') +
+        '</div><input type="hidden" id="courseColorInput" value="' + (existing ? existing.color : colors[0]) + '"></div>' +
+        (existing ? '<button class="danger-btn" id="deleteCourseBtn" style="margin-top:10px;">🗑️ 删除此课程</button>' : ''),
+      onConfirm: function() {
+        const name = document.getElementById('courseNameInput').value.trim();
+        if (!name) { showToast('请输入课程名称', 'error'); return false; }
+        const data = {
+          name: name,
+          day: parseInt(document.getElementById('courseDayInput').value),
+          startTime: document.getElementById('courseStartInput').value,
+          endTime: document.getElementById('courseEndInput').value,
+          room: document.getElementById('courseRoomInput').value.trim(),
+          teacher: document.getElementById('courseTeacherInput').value.trim(),
+          color: document.getElementById('courseColorInput').value
+        };
+        if (existing) {
+          Object.assign(existing, data);
+          dbPut('schedule', existing).then(function() { renderScheduleGrid(); showToast('已更新'); });
+        } else {
+          data.id = genId();
+          data.createdAt = Date.now();
+          dbAdd('schedule', data).then(function() { renderScheduleGrid(); showToast('已添加'); });
+        }
+      }
+    });
+
+    setTimeout(function() {
+      document.querySelectorAll('.color-dot').forEach(function(dot) {
+        dot.onclick = function() {
+          document.querySelectorAll('.color-dot').forEach(function(d) { d.classList.remove('selected'); });
+          dot.classList.add('selected');
+          document.getElementById('courseColorInput').value = dot.dataset.color;
+        };
+      });
+      const delBtn = document.getElementById('deleteCourseBtn');
+      if (delBtn) delBtn.onclick = function() {
+        if (existing) {
+          dbDelete('schedule', existing.id).then(function() { closeModal(); renderScheduleGrid(); showToast('已删除'); });
+        }
+      };
+    }, 100);
+  });
+}
+
+function syncTodayCoursesToTasks() {
+  const today = new Date().getDay();
+  const dayIdx = today === 0 ? 6 : today - 1;
+  dbGetAll('schedule').then(function(courses) {
+    const todayCourses = courses.filter(function(c) { return c.day === dayIdx; });
+    if (todayCourses.length === 0) { showToast('今天没有课程'); return; }
+    const todayStr = todayStr();
+    let count = 0;
+    todayCourses.forEach(function(c) {
+      dbAdd('tasks', {
+        id: genId(),
+        title: c.startTime + ' ' + c.name + (c.room ? '（' + c.room + '）' : ''),
+        content: '老师：' + (c.teacher || '未指定'),
+        date: todayStr,
+        completed: false,
+        type: 'course',
+        courseId: c.id,
+        createdAt: Date.now()
+      }).then(function() { count++; if (count === todayCourses.length) showToast('已同步' + count + '门课程到今日待办'); });
+    });
+  });
+}
+
+// ===== 学业管理模块 =====
+function renderAcademics() {
+  const container = document.getElementById('page-academics');
+  container.innerHTML =
+    '<div class="academics-tabs">' +
+      '<button class="academics-tab active" data-tab="exams">📝 考试倒计时</button>' +
+      '<button class="academics-tab" data-tab="grades">📊 成绩与GPA</button>' +
+    '</div>' +
+    '<div id="academicsContent"></div>';
+
+  const addBtn = document.getElementById('topbarAddBtn');
+  if (addBtn) addBtn.onclick = function() {
+    const active = document.querySelector('.academics-tab.active').dataset.tab;
+    if (active === 'exams') openExamModal();
+    else openGradeModal();
+  };
+
+  document.querySelectorAll('.academics-tab').forEach(function(tab) {
+    tab.onclick = function() {
+      document.querySelectorAll('.academics-tab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      renderAcademicsContent();
+    };
+  });
+
+  renderAcademicsContent();
+}
+
+function renderAcademicsContent() {
+  const active = document.querySelector('.academics-tab.active').dataset.tab;
+  const content = document.getElementById('academicsContent');
+  if (active === 'exams') renderExams(content);
+  else renderGrades(content);
+}
+
+function renderExams(container) {
+  dbGetAll('academics').then(function(all) {
+    const exams = all.filter(function(i) { return i.type === 'exam'; }).sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+    if (exams.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📝</div>还没有考试安排，点击右上角添加</div>';
+      return;
+    }
+    container.innerHTML = '<div class="exam-list">' + exams.map(function(exam) {
+      const days = Math.ceil((new Date(exam.date) - new Date(todayStr())) / (1000 * 60 * 60 * 24));
+      const urgent = days <= 7;
+      const passed = days < 0;
+      return '<div class="exam-card" data-id="' + exam.id + '" style="border-left:4px solid ' + (passed ? '#666' : urgent ? '#ff5252' : '#4fc3f7') + ';">' +
+        '<div class="exam-info">' +
+          '<div class="exam-name">' + escapeHtml(exam.name) + '</div>' +
+          '<div class="exam-date">' + exam.date + ' ' + escapeHtml(exam.location || '') + '</div>' +
+        '</div>' +
+        '<div class="exam-countdown ' + (passed ? 'passed' : urgent ? 'urgent' : '') + '">' +
+          (passed ? '已结束' : days === 0 ? '今天！' : days + '天') +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+
+    container.querySelectorAll('.exam-card').forEach(function(card) {
+      card.onclick = function() { openExamModal(card.dataset.id); };
+    });
+  });
+}
+
+function renderGrades(container) {
+  dbGetAll('academics').then(function(all) {
+    const grades = all.filter(function(i) { return i.type === 'grade'; });
+    let totalCredits = 0, totalPoints = 0;
+    grades.forEach(function(g) {
+      totalCredits += g.credits || 0;
+      totalPoints += (g.credits || 0) * (g.gpa || 0);
+    });
+    const gpa = totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : '0.00';
+
+    container.innerHTML =
+      '<div class="gpa-summary">' +
+        '<div class="gpa-box"><div class="gpa-value">' + gpa + '</div><div class="gpa-label">GPA (4.0制)</div></div>' +
+        '<div class="gpa-box"><div class="gpa-value">' + totalCredits + '</div><div class="gpa-label">总学分</div></div>' +
+        '<div class="gpa-box"><div class="gpa-value">' + grades.length + '</div><div class="gpa-label">已修课程</div></div>' +
+      '</div>' +
+      (grades.length === 0 ? '<div class="empty-state"><div class="icon">📊</div>还没有成绩，点击右上角添加</div>' :
+      '<div class="grade-list">' + grades.map(function(g) {
+        return '<div class="grade-card" data-id="' + g.id + '">' +
+          '<div class="grade-name">' + escapeHtml(g.course) + '</div>' +
+          '<div class="grade-score">' + g.score + '分</div>' +
+          '<div class="grade-credits">' + g.credits + '学分</div>' +
+          '<div class="grade-gpa">GPA ' + g.gpa + '</div>' +
+        '</div>';
+      }).join('') + '</div>');
+
+    container.querySelectorAll('.grade-card').forEach(function(card) {
+      card.onclick = function() { openGradeModal(card.dataset.id); };
+    });
+  });
+}
+
+function scoreToGpa(score) {
+  if (score >= 90) return 4.0;
+  if (score >= 85) return 3.7;
+  if (score >= 82) return 3.3;
+  if (score >= 78) return 3.0;
+  if (score >= 75) return 2.7;
+  if (score >= 72) return 2.3;
+  if (score >= 68) return 2.0;
+  if (score >= 64) return 1.5;
+  if (score >= 60) return 1.0;
+  return 0;
+}
+
+function openExamModal(examId) {
+  let existing = null;
+  const loadPromise = examId ? dbGet('academics', examId).then(function(e) { existing = e; }) : Promise.resolve();
+  loadPromise.then(function() {
+    openModal({
+      title: existing ? '编辑考试' : '添加考试',
+      bodyHTML:
+        '<div class="form-group"><label>考试名称</label><input type="text" id="examNameInput" value="' + escapeHtml(existing ? existing.name : '') + '" placeholder="如：分析化学期末"></div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>考试日期</label><input type="date" id="examDateInput" value="' + (existing ? existing.date : '') + '"></div>' +
+          '<div class="form-group"><label>地点</label><input type="text" id="examLocationInput" value="' + escapeHtml(existing ? existing.location || '' : '') + '"></div>' +
+        '</div>' +
+        (existing ? '<button class="danger-btn" id="deleteExamBtn" style="margin-top:10px;">🗑️ 删除</button>' : ''),
+      onConfirm: function() {
+        const name = document.getElementById('examNameInput').value.trim();
+        const date = document.getElementById('examDateInput').value;
+        if (!name || !date) { showToast('请填写名称和日期', 'error'); return false; }
+        const data = { type: 'exam', name: name, date: date, location: document.getElementById('examLocationInput').value.trim() };
+        if (existing) { Object.assign(existing, data); dbPut('academics', existing).then(function() { renderAcademicsContent(); showToast('已更新'); }); }
+        else { data.id = genId(); data.createdAt = Date.now(); dbAdd('academics', data).then(function() { renderAcademicsContent(); showToast('已添加'); }); }
+      }
+    });
+    setTimeout(function() {
+      const delBtn = document.getElementById('deleteExamBtn');
+      if (delBtn) delBtn.onclick = function() { if (existing) { dbDelete('academics', existing.id).then(function() { closeModal(); renderAcademicsContent(); showToast('已删除'); }); } };
+    }, 100);
+  });
+}
+
+function openGradeModal(gradeId) {
+  let existing = null;
+  const loadPromise = gradeId ? dbGet('academics', gradeId).then(function(g) { existing = g; }) : Promise.resolve();
+  loadPromise.then(function() {
+    openModal({
+      title: existing ? '编辑成绩' : '添加成绩',
+      bodyHTML:
+        '<div class="form-group"><label>课程名称</label><input type="text" id="gradeCourseInput" value="' + escapeHtml(existing ? existing.course : '') + '"></div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>分数</label><input type="number" id="gradeScoreInput" value="' + (existing ? existing.score : '') + '" placeholder="0-100" min="0" max="100"></div>' +
+          '<div class="form-group"><label>学分</label><input type="number" id="gradeCreditsInput" value="' + (existing ? existing.credits : '') + '" placeholder="如：3" min="0" step="0.5"></div>' +
+        '</div>' +
+        '<div class="form-group" id="gpaPreview" style="color:var(--text-light);font-size:13px;">输入分数后自动计算GPA</div>' +
+        (existing ? '<button class="danger-btn" id="deleteGradeBtn" style="margin-top:10px;">🗑️ 删除</button>' : ''),
+      onConfirm: function() {
+        const course = document.getElementById('gradeCourseInput').value.trim();
+        const score = parseFloat(document.getElementById('gradeScoreInput').value);
+        const credits = parseFloat(document.getElementById('gradeCreditsInput').value);
+        if (!course || isNaN(score) || isNaN(credits)) { showToast('请填写完整', 'error'); return false; }
+        const data = { type: 'grade', course: course, score: score, credits: credits, gpa: scoreToGpa(score) };
+        if (existing) { Object.assign(existing, data); dbPut('academics', existing).then(function() { renderAcademicsContent(); showToast('已更新'); }); }
+        else { data.id = genId(); data.createdAt = Date.now(); dbAdd('academics', data).then(function() { renderAcademicsContent(); showToast('已添加'); }); }
+      }
+    });
+    setTimeout(function() {
+      const scoreInput = document.getElementById('gradeScoreInput');
+      scoreInput.oninput = function() {
+        const s = parseFloat(scoreInput.value);
+        document.getElementById('gpaPreview').textContent = isNaN(s) ? '输入分数后自动计算GPA' : '对应GPA：' + scoreToGpa(s);
+      };
+      const delBtn = document.getElementById('deleteGradeBtn');
+      if (delBtn) delBtn.onclick = function() { if (existing) { dbDelete('academics', existing.id).then(function() { closeModal(); renderAcademicsContent(); showToast('已删除'); }); } };
+    }, 100);
+  });
+}
+
 function renderMedia() {
   const container = document.getElementById('page-media');
   container.innerHTML =
