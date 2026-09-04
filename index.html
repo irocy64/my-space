@@ -6438,6 +6438,12 @@ function showWorkoutPlanPreview(data, rawReply) {
     scope.querySelectorAll('.del-day-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         this.closest('.day-plan-card').remove();
+        // 重新编号所有天
+        const cards = scope.querySelectorAll('.day-plan-card');
+        cards.forEach(function(card, idx) {
+          const title = card.querySelector('.day-title');
+          if (title) title.textContent = '第 ' + (idx + 1) + ' 天';
+        });
       });
     });
   }, 100);
