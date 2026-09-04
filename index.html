@@ -7897,6 +7897,7 @@ function renderSettings() {
       '<div class="section-title">⚠️ 危险操作</div>' +
       '<div class="settings-btn-row">' +
         '<button class="settings-btn danger" id="clearDataBtn">🗑️ 清空全部数据</button>' +
+        '<button class="settings-btn" id="cleanOldDataBtn">🧹 清理30天前数据</button>' +
       '</div>' +
     '</div>' +
     '<div class="settings-section">' +
@@ -8022,6 +8023,8 @@ function renderSettings() {
   });
 
   document.getElementById('clearDataBtn').addEventListener('click', clearAllData);
+  const cleanOldBtn = document.getElementById('cleanOldDataBtn');
+  if (cleanOldBtn) cleanOldBtn.addEventListener('click', cleanOldData);
 
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.style.display = 'none';
@@ -8224,6 +8227,31 @@ function importAllData(file) {
         }
       };
       reader.readAsText(file);
+    }
+  });
+}
+
+// 清理30天前的旧数据
+function cleanOldData() {
+  showConfirm({
+    title: '清理旧数据',
+    message: '将删除30天前的任务、学习、健身、饮食、游戏等记录（设置和模块配置保留）。确定继续吗？',
+    danger: true,
+    onConfirm: async function() {
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const dateStores = ['tasks', 'english', 'workouts', 'meals', 'gameLogs', 'experiments'];
+      let totalDeleted = 0;
+      for (const storeName of dateStores) {
+        const items = await dbGetAll(storeName);
+        for (const item of items) {
+          if (item.createdAt && item.createdAt < cutoff) {
+            await dbDelete(storeName, item.id);
+            totalDeleted++;
+          }
+        }
+      }
+      showToast('已清理 ' + totalDeleted + ' 条旧数据', 'success');
+      if (typeof renderCurrentPage === 'function') renderCurrentPage();
     }
   });
 }
