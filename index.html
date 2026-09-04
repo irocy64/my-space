@@ -3396,9 +3396,10 @@ function loadHomeTimeline() {
     timelineEl.innerHTML = todayTasks.map(function(t) {
       const time = new Date(t.createdAt);
       const timeStr = String(time.getHours()).padStart(2, '0') + ':' + String(time.getMinutes()).padStart(2, '0');
+      const displayText = t.title || (t.content && t.content.length > 80 ? t.content.slice(0, 80) + '...' : t.content || '');
       return '<div class="home-timeline-item ' + (t.completed ? 'completed' : '') + '" data-id="' + t.id + '">' +
         '<span class="timeline-time">' + timeStr + '</span>' +
-        '<span class="timeline-content">' + escapeHtml(t.content) + '</span>' +
+        '<span class="timeline-content">' + escapeHtml(displayText) + '</span>' +
         '</div>';
     }).join('');
     // 点击时间线事项跳转今日计划
