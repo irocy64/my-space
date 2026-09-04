@@ -6856,12 +6856,16 @@ function parseBookPlanFromText(reply) {
   if (!data || !data.plan) {
     const plan = [];
     const cleanedReply = cleanMarkdown(reply);
-    // 识别阶段
-    const phaseRegex = /(?:第\s*(\d+)\s*[-~到至]\s*(\d+)\s*天|阶段\s*[一二三四五六七八九十\d]+|Phase\s*\d+)/gi;
+    // 识别阶段：前N天、第X-Y天
+    const phaseRegex = /(?:前\s*(\d+)\s*天|第\s*(\d+)\s*[-~到至]\s*(\d+)\s*天|第\s*(\d+)\s*天到第\s*(\d+)\s*天)/gi;
     const phases = [];
     let pm;
     while ((pm = phaseRegex.exec(cleanedReply)) !== null) {
-      phases.push({ start: pm[1] ? parseInt(pm[1]) : null, end: pm[2] ? parseInt(pm[2]) : null, startIndex: pm.index });
+      let startDay, endDay;
+      if (pm[1]) { startDay = 1; endDay = parseInt(pm[1]); }
+      else if (pm[2]) { startDay = parseInt(pm[2]); endDay = parseInt(pm[3]); }
+      else { startDay = parseInt(pm[4]); endDay = parseInt(pm[5]); }
+      phases.push({ start: startDay, end: endDay, startIndex: pm.index });
     }
     // 识别 Day 标记
     const dayRegex = /(?:Day\s*(\d+)|day\s*(\d+)|第\s*(\d+|[一二三四五六七八九十]+)\s*天)/gi;
@@ -6882,10 +6886,11 @@ function parseBookPlanFromText(reply) {
       } else {
         content = cleanMarkdown(dayText.replace(/Day\s*\d+[：:]?\s*/i, '').replace(/第\s*\d+\s*天[：:]?\s*/, '').trim()).slice(0, 150);
       }
-      if (content && content.length > 2 && !/^(第.+天|阶段|Phase|核心原则|目标|说明)/.test(content)) {
+      if (content && content.length > 2 && !/^(第.+天|阶段|Phase|核心原则|目标|说明|一[、.．]|二[、.．]|三[、.．])/.test(content)) {
         plan.push({ day: globalDay, content: content });
       }
     };
+    // 情况1：有阶段 + 有Day标记
     if (phases.length > 0 && dayPositions.length > 0) {
       for (let i = 0; i < dayPositions.length; i++) {
         const dayInfo = dayPositions[i];
@@ -6898,20 +6903,46 @@ function parseBookPlanFromText(reply) {
         const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : cleanedReply.length;
         processDay(globalDay, dayInfo.start, end);
       }
-    } else if (dayPositions.length > 0) {
+    }
+    // 情况2：有阶段但没有Day标记 → 阶段内容按天分配
+    else if (phases.length > 0) {
+      for (let i = 0; i < phases.length; i++) {
+        const phase = phases[i];
+        const end = i < phases.length - 1 ? phases[i+1].startIndex : cleanedReply.length;
+        const phaseText = cleanedReply.slice(phase.startIndex, end);
+        const oldLen = plan.length;
+        processDay(1, phase.startIndex, end);
+        if (plan.length > oldLen && phase.end >= phase.start) {
+          const content = plan[plan.length-1].content;
+          plan.length = oldLen; // 回退
+          const numDays = phase.end - phase.start + 1;
+          for (let d = 0; d < numDays; d++) {
+            plan.push({ day: phase.start + d, content: content });
+          }
+        }
+      }
+    }
+    // 情况3：有Day标记但没有阶段
+    else if (dayPositions.length > 0) {
       for (let i = 0; i < dayPositions.length; i++) {
         const dayInfo = dayPositions[i];
         const end = i < dayPositions.length - 1 ? dayPositions[i+1].start : cleanedReply.length;
         processDay(dayInfo.day, dayInfo.start, end);
       }
-    } else {
-      // 按段落分割
-      const sections = cleanedReply.split(/\n(?=\d+[.、\s])|\n(?=##)/);
-      for (let i = 0; i < sections.length; i++) {
-        const section = sections[i].trim();
-        if (section.length > 10 && !/^(第.+天|阶段|Phase|核心原则|节奏|目标)/.test(section)) {
-          const content = cleanMarkdown(section.slice(0, 150));
-          if (content.length > 5) plan.push({ day: i + 1, content: content });
+    }
+    // 情况4：都没有，按段落分割（跳过标题）
+    else {
+      const sections = cleanedReply.split(/\n\n+/);
+      let dayCount = 0;
+      for (const section of sections) {
+        const trimmed = section.trim();
+        if (trimmed.length < 10) continue;
+        if (/^(一[、.．]|二[、.．]|三[、.．]|四[、.．]|五[、.．]|整体|核心原则|目标|说明|备注)/.test(trimmed)) continue;
+        const oldLen = plan.length;
+        processDay(1, 0, trimmed.length);
+        if (plan.length > oldLen) {
+          dayCount++;
+          plan[plan.length-1].day = dayCount;
         }
       }
     }
