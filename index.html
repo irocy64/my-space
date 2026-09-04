@@ -8410,7 +8410,7 @@ async function callDoubaoApi(messages) {
     model: AI_MODEL,
     messages: messages,
     temperature: 0.7,
-    max_tokens: 4096
+    max_tokens: 8192
   };
   if (window._aiThinkingEnabled) {
     body.thinking = { type: 'enabled' };
@@ -8470,7 +8470,7 @@ async function sendAiMessage(text) {
       model: AI_MODEL,
       messages: aiConversation,
       temperature: 0.7,
-      max_tokens: 4096,
+      max_tokens: 8192,
       stream: true
     };
     if (window._aiThinkingEnabled) {
