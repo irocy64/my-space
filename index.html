@@ -6553,13 +6553,14 @@ function showWorkoutPlanPreview(data, rawReply) {
     bodyHTML: planHTML,
     confirmText: '确认导入',
     onConfirm: function() {
-      // 收集编辑后的数据
+      // 直接从DOM收集编辑后的数据，不依赖闭包中的data变量
       const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
       const scope = modal || document;
       const newPlan = [];
-      data.plan.forEach(function(dayPlan, idx) {
-        const muscleInput = scope.querySelector('.day-muscle[data-day="' + idx + '"]');
-        const exRows = scope.querySelectorAll('.exercise-input-row[data-day="' + idx + '"]');
+      const dayCards = scope.querySelectorAll('.day-plan-card');
+      dayCards.forEach(function(card, idx) {
+        const muscleInput = card.querySelector('.day-muscle');
+        const exRows = card.querySelectorAll('.exercise-input-row');
         const exercises = [];
         exRows.forEach(function(row) {
           const name = row.querySelector('.ex-name') ? row.querySelector('.ex-name').value.trim() : '';
@@ -6567,10 +6568,10 @@ function showWorkoutPlanPreview(data, rawReply) {
           const reps = row.querySelector('.ex-reps') ? row.querySelector('.ex-reps').value.trim() : '12';
           if (name) exercises.push({ name: name, weight: null, sets: sets, reps: reps, notes: '' });
         });
-        const muscle = muscleInput ? muscleInput.value.trim() : (dayPlan.muscleGroup || '综合训练');
+        const muscle = muscleInput ? muscleInput.value.trim() : '综合训练';
         if (muscle || exercises.length > 0) {
           newPlan.push({
-            day: dayPlan.day,
+            day: idx + 1,
             muscleGroup: muscle || '综合训练',
             duration: 60,
             exercises: exercises,
@@ -6585,6 +6586,8 @@ function showWorkoutPlanPreview(data, rawReply) {
       saveWorkoutPlanToDB({ plan: newPlan }).then(function(total) {
         showToast('已导入 ' + total + ' 天训练计划', 'success');
         renderWorkouts();
+      }).catch(function(err) {
+        showToast('导入失败：' + err.message, 'error');
       });
       return true;
     }
