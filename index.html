@@ -2473,6 +2473,43 @@ body::before {
   margin-top: 4px;
 }
 
+/* ===== Nutrient Card ===== */
+.nutrient-card {
+  background: var(--card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.nutrient-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.nutrient-row span:first-child {
+  width: 45px;
+  color: var(--text-light);
+}
+.nutrient-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.nutrient-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+.nutrient-row span:last-child {
+  width: 40px;
+  text-align: right;
+  font-weight: 600;
+}
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -8581,6 +8618,12 @@ function renderMeals() {
       '<div class="calorie-nums"><span class="consumed" id="mealsConsumed">0 kcal</span><span class="target" id="mealsTargetText">目标 2000 kcal</span></div>' +
       '<div class="progress-bar"><div class="progress-fill" id="mealsProgressFill" style="width:0%;background:var(--c-meals);"></div></div>' +
     '</div>' +
+    '<div class="nutrient-card" id="nutrientCard" style="display:none;">' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:8px;">🥗 今日营养素</div>' +
+      '<div class="nutrient-row"><span>蛋白质</span><div class="nutrient-bar"><div class="nutrient-fill" id="proteinFill" style="background:#4fc3f7;"></div></div><span id="proteinText">0g</span></div>' +
+      '<div class="nutrient-row"><span>碳水</span><div class="nutrient-bar"><div class="nutrient-fill" id="carbsFill" style="background:#ffb74d;"></div></div><span id="carbsText">0g</span></div>' +
+      '<div class="nutrient-row"><span>脂肪</span><div class="nutrient-bar"><div class="nutrient-fill" id="fatFill" style="background:#f06292;"></div></div><span id="fatText">0g</span></div>' +
+    '</div>' +
     '<div class="ai-meal-plan-card" id="aiMealPlanCard">' +
       '<div class="ai-meal-plan-header">' +
         '<span style="font-size:15px;font-weight:600;">🤖 AI 饮食计划</span>' +
@@ -8853,6 +8896,31 @@ function updateMealsProgress() {
     document.getElementById('mealsConsumed').textContent = consumed + ' kcal';
     const pct = target > 0 ? Math.min(100, consumed / target * 100) : 0;
     document.getElementById('mealsProgressFill').style.width = pct + '%';
+
+    // 计算营养素（基于食物描述估算）
+    let totalProtein = 0, totalCarbs = 0, totalFat = 0;
+    dayMeals.forEach(function(m) {
+      if (m.foods) {
+        const est = estimateCalories(m.foods);
+        totalProtein += est.protein || 0;
+        totalCarbs += est.carbs || 0;
+        totalFat += est.fat || 0;
+      }
+    });
+
+    const nutrientCard = document.getElementById('nutrientCard');
+    if (nutrientCard && dayMeals.length > 0) {
+      nutrientCard.style.display = 'block';
+      const maxNutrient = Math.max(totalProtein, totalCarbs, totalFat, 1);
+      document.getElementById('proteinFill').style.width = (totalProtein / maxNutrient * 100) + '%';
+      document.getElementById('carbsFill').style.width = (totalCarbs / maxNutrient * 100) + '%';
+      document.getElementById('fatFill').style.width = (totalFat / maxNutrient * 100) + '%';
+      document.getElementById('proteinText').textContent = totalProtein + 'g';
+      document.getElementById('carbsText').textContent = totalCarbs + 'g';
+      document.getElementById('fatText').textContent = totalFat + 'g';
+    } else if (nutrientCard) {
+      nutrientCard.style.display = 'none';
+    }
   });
 }
 
@@ -8967,49 +9035,45 @@ function editMeal(id) {
 // ===== 食物热量数据库 =====
 const FOOD_CALORIE_DB = [
   // 主食
-  { name: '米饭', aliases: ['白米饭', '大米饭'], calPer100g: 116, defaultGram: 150 },
-  { name: '面条', aliases: ['挂面', '汤面', '拌面'], calPer100g: 110, defaultGram: 200 },
-  { name: '馒头', aliases: ['白馒头'], calPer100g: 223, defaultGram: 100 },
-  { name: '包子', aliases: ['肉包', '菜包'], calPer100g: 227, defaultGram: 100 },
-  { name: '饺子', aliases: ['水饺', '蒸饺'], calPer100g: 253, defaultGram: 200 },
-  { name: '粥', aliases: ['白粥', '大米粥'], calPer100g: 46, defaultGram: 300 },
-  { name: '燕麦', aliases: ['燕麦片', '燕麦粥'], calPer100g: 377, defaultGram: 40 },
-  { name: '红薯', aliases: ['地瓜', '番薯'], calPer100g: 86, defaultGram: 200 },
-  { name: '玉米', aliases: ['甜玉米', '糯玉米'], calPer100g: 112, defaultGram: 200 },
-  { name: '面包', aliases: ['吐司', '全麦面包'], calPer100g: 313, defaultGram: 60 },
-  // 蛋白质
-  { name: '鸡蛋', aliases: ['水煮蛋', '煎蛋', '蒸蛋'], calPer100g: 144, defaultGram: 50 },
-  { name: '鸡胸肉', aliases: ['鸡胸', '水煮鸡胸'], calPer100g: 133, defaultGram: 150 },
-  { name: '鸡腿', aliases: ['琵琶腿', '卤鸡腿'], calPer100g: 181, defaultGram: 150 },
-  { name: '牛肉', aliases: ['酱牛肉', '卤牛肉', '牛排'], calPer100g: 125, defaultGram: 150 },
-  { name: '猪肉', aliases: ['红烧肉', '回锅肉', '瘦肉'], calPer100g: 395, defaultGram: 100 },
-  { name: '鱼', aliases: ['草鱼', '鲈鱼', '清蒸鱼', '烤鱼'], calPer100g: 113, defaultGram: 150 },
-  { name: '虾', aliases: ['基围虾', '白灼虾', '虾仁'], calPer100g: 93, defaultGram: 100 },
-  { name: '豆腐', aliases: ['嫩豆腐', '老豆腐', '麻婆豆腐'], calPer100g: 81, defaultGram: 150 },
-  { name: '牛奶', aliases: ['纯牛奶', '鲜牛奶'], calPer100g: 54, defaultGram: 250 },
-  { name: '酸奶', aliases: ['原味酸奶'], calPer100g: 72, defaultGram: 150 },
-  { name: '豆浆', aliases: ['黄豆浆', '黑豆浆'], calPer100g: 31, defaultGram: 300 },
-  // 蔬菜
-  { name: '西兰花', aliases: ['西蓝花'], calPer100g: 36, defaultGram: 150 },
-  { name: '青菜', aliases: ['小白菜', '上海青', '油麦菜'], calPer100g: 15, defaultGram: 200 },
-  { name: '番茄', aliases: ['西红柿'], calPer100g: 18, defaultGram: 150 },
-  { name: '黄瓜', aliases: ['青瓜'], calPer100g: 16, defaultGram: 150 },
-  { name: '胡萝卜', aliases: ['红萝卜'], calPer100g: 37, defaultGram: 100 },
-  { name: '土豆', aliases: ['马铃薯', '土豆丝'], calPer100g: 77, defaultGram: 150 },
-  { name: '茄子', aliases: ['红烧茄子', '蒸茄子'], calPer100g: 23, defaultGram: 150 },
-  // 水果
-  { name: '苹果', aliases: ['红富士', '青苹果'], calPer100g: 53, defaultGram: 200 },
-  { name: '香蕉', aliases: ['芭蕉'], calPer100g: 91, defaultGram: 120 },
-  { name: '橙子', aliases: ['脐橙', '橘子', '桔子'], calPer100g: 48, defaultGram: 150 },
-  { name: '葡萄', aliases: ['提子', '巨峰葡萄'], calPer100g: 45, defaultGram: 100 },
-  { name: '西瓜', aliases: [], calPer100g: 26, defaultGram: 300 },
-  // 饮品零食
-  { name: '咖啡', aliases: ['黑咖啡', '美式'], calPer100g: 2, defaultGram: 300 },
-  { name: '奶茶', aliases: ['珍珠奶茶', '果茶'], calPer100g: 52, defaultGram: 500 },
-  { name: '可乐', aliases: ['汽水', '碳酸饮料'], calPer100g: 43, defaultGram: 330 },
-  { name: '坚果', aliases: ['核桃', '杏仁', '巴旦木', '腰果'], calPer100g: 607, defaultGram: 30 },
-  { name: '巧克力', aliases: ['黑巧克力'], calPer100g: 586, defaultGram: 30 },
-  { name: '薯片', aliases: ['薯条', '膨化食品'], calPer100g: 547, defaultGram: 50 }
+  { name: '米饭', aliases: ['白米饭', '大米饭'], calPer100g: 116, defaultGram: 150, protein: 2.6, carbs: 25.9, fat: 0.3 },
+  { name: '面条', aliases: ['挂面', '汤面', '拌面'], calPer100g: 110, defaultGram: 200, protein: 4.5, carbs: 22, fat: 0.5 },
+  { name: '鸡蛋', aliases: ['水煮蛋', '煎蛋', '蒸蛋'], calPer100g: 144, defaultGram: 50, protein: 13.3, carbs: 2.8, fat: 8.8 },
+  { name: '鸡胸肉', aliases: ['鸡胸', '水煮鸡胸'], calPer100g: 133, defaultGram: 150, protein: 19.4, carbs: 2.5, fat: 5 },
+  { name: '牛奶', aliases: ['纯牛奶', '鲜牛奶'], calPer100g: 54, defaultGram: 250, protein: 3, carbs: 3.4, fat: 3.2 },
+  { name: '燕麦', aliases: ['燕麦片', '燕麦粥'], calPer100g: 377, defaultGram: 40, protein: 15, carbs: 61.6, fat: 6.7 },
+  { name: '苹果', aliases: ['红富士', '青苹果'], calPer100g: 53, defaultGram: 200, protein: 0.2, carbs: 13.5, fat: 0.2 },
+  { name: '香蕉', aliases: ['芭蕉'], calPer100g: 91, defaultGram: 120, protein: 1.4, carbs: 22, fat: 0.2 },
+  { name: '西兰花', aliases: ['西蓝花'], calPer100g: 36, defaultGram: 150, protein: 4.1, carbs: 4.3, fat: 0.6 },
+  { name: '豆腐', aliases: ['嫩豆腐', '老豆腐', '麻婆豆腐'], calPer100g: 81, defaultGram: 150, protein: 8.1, carbs: 1.9, fat: 3.7 },
+  { name: '牛肉', aliases: ['酱牛肉', '卤牛肉', '牛排'], calPer100g: 125, defaultGram: 150, protein: 19.9, carbs: 2, fat: 4.2 },
+  { name: '鱼', aliases: ['草鱼', '鲈鱼', '清蒸鱼', '烤鱼'], calPer100g: 113, defaultGram: 150, protein: 16.6, carbs: 0, fat: 5.2 },
+  { name: '红薯', aliases: ['地瓜', '番薯'], calPer100g: 86, defaultGram: 200, protein: 1.6, carbs: 20.1, fat: 0.1 },
+  { name: '玉米', aliases: ['甜玉米', '糯玉米'], calPer100g: 112, defaultGram: 200, protein: 4, carbs: 22.8, fat: 1.2 },
+  { name: '酸奶', aliases: ['原味酸奶'], calPer100g: 72, defaultGram: 150, protein: 2.5, carbs: 9.3, fat: 2.7 },
+  { name: '豆浆', aliases: ['黄豆浆', '黑豆浆'], calPer100g: 31, defaultGram: 300, protein: 3, carbs: 1.1, fat: 1.6 },
+  { name: '馒头', aliases: ['白馒头'], calPer100g: 223, defaultGram: 100, protein: 7, carbs: 47, fat: 1.1 },
+  { name: '包子', aliases: ['肉包', '菜包'], calPer100g: 227, defaultGram: 100, protein: 10, carbs: 30, fat: 7 },
+  { name: '饺子', aliases: ['水饺', '蒸饺'], calPer100g: 253, defaultGram: 200, protein: 10, carbs: 35, fat: 8 },
+  { name: '粥', aliases: ['白粥', '大米粥'], calPer100g: 46, defaultGram: 300, protein: 1.1, carbs: 9.9, fat: 0.1 },
+  { name: '面包', aliases: ['吐司', '全麦面包'], calPer100g: 313, defaultGram: 60, protein: 8.3, carbs: 58.6, fat: 5.1 },
+  { name: '鸡腿', aliases: ['琵琶腿', '卤鸡腿'], calPer100g: 181, defaultGram: 150, protein: 16, carbs: 0, fat: 13 },
+  { name: '猪肉', aliases: ['红烧肉', '回锅肉', '瘦肉'], calPer100g: 395, defaultGram: 100, protein: 13.2, carbs: 2.4, fat: 37 },
+  { name: '虾', aliases: ['基围虾', '白灼虾', '虾仁'], calPer100g: 93, defaultGram: 100, protein: 18.6, carbs: 0, fat: 0.8 },
+  { name: '青菜', aliases: ['小白菜', '上海青', '油麦菜'], calPer100g: 15, defaultGram: 200, protein: 1.5, carbs: 2.7, fat: 0.3 },
+  { name: '番茄', aliases: ['西红柿'], calPer100g: 18, defaultGram: 150, protein: 0.9, carbs: 4, fat: 0.2 },
+  { name: '黄瓜', aliases: ['青瓜'], calPer100g: 16, defaultGram: 150, protein: 0.8, carbs: 2.9, fat: 0.2 },
+  { name: '胡萝卜', aliases: ['红萝卜'], calPer100g: 37, defaultGram: 100, protein: 1, carbs: 8.8, fat: 0.2 },
+  { name: '土豆', aliases: ['马铃薯', '土豆丝'], calPer100g: 77, defaultGram: 150, protein: 2, carbs: 17.2, fat: 0.2 },
+  { name: '茄子', aliases: ['红烧茄子', '蒸茄子'], calPer100g: 23, defaultGram: 150, protein: 1.1, carbs: 4.9, fat: 0.2 },
+  { name: '橙子', aliases: ['脐橙', '橘子', '桔子'], calPer100g: 48, defaultGram: 150, protein: 0.8, carbs: 11.1, fat: 0.2 },
+  { name: '葡萄', aliases: ['提子', '巨峰葡萄'], calPer100g: 45, defaultGram: 100, protein: 0.5, carbs: 10.3, fat: 0.2 },
+  { name: '西瓜', aliases: [], calPer100g: 26, defaultGram: 300, protein: 0.6, carbs: 5.8, fat: 0.1 },
+  { name: '咖啡', aliases: ['黑咖啡', '美式'], calPer100g: 2, defaultGram: 300, protein: 0.1, carbs: 0, fat: 0 },
+  { name: '奶茶', aliases: ['珍珠奶茶', '果茶'], calPer100g: 52, defaultGram: 500, protein: 1, carbs: 10, fat: 1 },
+  { name: '可乐', aliases: ['汽水', '碳酸饮料'], calPer100g: 43, defaultGram: 330, protein: 0, carbs: 10.6, fat: 0 },
+  { name: '坚果', aliases: ['核桃', '杏仁', '巴旦木', '腰果'], calPer100g: 607, defaultGram: 30, protein: 20, carbs: 20, fat: 50 },
+  { name: '巧克力', aliases: ['黑巧克力'], calPer100g: 586, defaultGram: 30, protein: 4.3, carbs: 53.4, fat: 40.1 },
+  { name: '薯片', aliases: ['薯条', '膨化食品'], calPer100g: 547, defaultGram: 50, protein: 7, carbs: 53, fat: 35 }
 ];
 
 function estimateCalories(foodText) {
@@ -9062,12 +9126,23 @@ function estimateCalories(foodText) {
     if (matched) {
       const useGram = gram || matched.defaultGram;
       const cal = Math.round((matched.calPer100g * useGram) / 100);
+      const protein = Math.round(((matched.protein || 0) * useGram) / 100);
+      const carbs = Math.round(((matched.carbs || 0) * useGram) / 100);
+      const fat = Math.round(((matched.fat || 0) * useGram) / 100);
       total += cal;
-      items.push({ name: matched.name, gram: useGram, cal: cal });
+      items.push({ name: matched.name, gram: useGram, cal: cal, protein: protein, carbs: carbs, fat: fat });
     }
   });
 
-  return { total: total, items: items };
+  // 汇总营养素
+  let totalProtein = 0, totalCarbs = 0, totalFat = 0;
+  items.forEach(function(i) {
+    totalProtein += i.protein || 0;
+    totalCarbs += i.carbs || 0;
+    totalFat += i.fat || 0;
+  });
+
+  return { total: total, items: items, protein: totalProtein, carbs: totalCarbs, fat: totalFat };
 }
 
 function deleteMeal(id) {
