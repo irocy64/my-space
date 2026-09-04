@@ -7605,6 +7605,21 @@ function renderSettings() {
       '</div>' +
     '</div>' +
     '<div class="settings-section">' +
+      '<div class="section-title">🔔 每日提醒</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text);">' +
+          '<input type="checkbox" id="settingsReminderToggle" style="cursor:pointer;">' +
+          '开启每日任务提醒（浏览器通知）' +
+        '</label>' +
+      '</div>' +
+      '<div style="margin-bottom:12px;display:flex;gap:12px;align-items:center;">' +
+        '<label style="font-size:13px;color:var(--text);">提醒时间：</label>' +
+        '<input type="time" id="settingsReminderTime" value="08:00" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:13px;">' +
+        '<button class="btn-primary" id="settingsReminderSaveBtn" style="padding:6px 14px;font-size:13px;">保存</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text-light);">提醒内容：汇总当天所有未完成任务，浏览器推送通知。需保持页面打开。</div>' +
+    '</div>' +
+    '<div class="settings-section">' +
       '<div class="section-title">📊 各模块数据统计</div>' +
       '<div class="module-stats-grid" id="moduleStatsGrid"></div>' +
     '</div>' +
@@ -7668,6 +7683,43 @@ function renderSettings() {
     });
   }
 
+  // 每日提醒设置
+  const reminderToggle = document.getElementById('settingsReminderToggle');
+  const reminderTimeInput = document.getElementById('settingsReminderTime');
+  const reminderSaveBtn = document.getElementById('settingsReminderSaveBtn');
+  if (reminderToggle) {
+    reminderToggle.checked = localStorage.getItem('reminderEnabled') === '1';
+    reminderToggle.addEventListener('change', function() {
+      localStorage.setItem('reminderEnabled', this.checked ? '1' : '0');
+      if (this.checked) {
+        if ('Notification' in window && Notification.permission !== 'granted') {
+          Notification.requestPermission();
+        }
+        startReminderCheck();
+      } else {
+        stopReminderCheck();
+      }
+    });
+  }
+  if (reminderTimeInput) {
+    reminderTimeInput.value = localStorage.getItem('reminderTime') || '08:00';
+  }
+  if (reminderSaveBtn) {
+    reminderSaveBtn.addEventListener('click', function() {
+      const time = reminderTimeInput.value;
+      localStorage.setItem('reminderTime', time);
+      showToast('提醒时间已保存：' + time, 'success');
+      if (reminderToggle && reminderToggle.checked) {
+        stopReminderCheck();
+        startReminderCheck();
+      }
+    });
+  }
+  // 页面加载时如果已开启提醒，启动检查
+  if (localStorage.getItem('reminderEnabled') === '1') {
+    startReminderCheck();
+  }
+
   document.getElementById('exportDataBtn').addEventListener('click', exportAllData);
 
   const importZone = document.getElementById('importZone');
@@ -7691,6 +7743,75 @@ function renderSettings() {
 
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.style.display = 'none';
+}
+
+// 每日提醒功能
+let _reminderInterval = null;
+let _lastReminderDate = null;
+
+function startReminderCheck() {
+  stopReminderCheck();
+  _reminderInterval = setInterval(checkReminder, 60000); // 每分钟检查一次
+  checkReminder(); // 立即检查一次
+}
+
+function stopReminderCheck() {
+  if (_reminderInterval) {
+    clearInterval(_reminderInterval);
+    _reminderInterval = null;
+  }
+}
+
+function checkReminder() {
+  if (localStorage.getItem('reminderEnabled') !== '1') return;
+  const reminderTime = localStorage.getItem('reminderTime') || '08:00';
+  const now = new Date();
+  const currentTime = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const todayStr = now.toDateString();
+  
+  // 只在提醒时间后的10分钟内发送，且今天还没发送过
+  if (currentTime >= reminderTime && _lastReminderDate !== todayStr) {
+    _lastReminderDate = todayStr;
+    sendDailyReminder();
+  }
+}
+
+function sendDailyReminder() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  
+  const today = todayStr();
+  // 汇总今天所有未完成任务
+  Promise.all([
+    dbGetAll('tasks'),
+    dbGetAll('english'),
+    dbGetAll('workouts')
+  ]).then(function(results) {
+    const tasks = results[0].filter(function(t) { return t.date === today && !t.completed; });
+    const english = results[1].filter(function(t) { return t.date === today && !t.completed; });
+    const workouts = results[2].filter(function(t) { return t.date === today; });
+    
+    const totalPending = tasks.length + english.length + workouts.length;
+    let body = '';
+    if (totalPending === 0) {
+      body = '今天所有任务都完成了，太棒了！';
+    } else {
+      const parts = [];
+      if (tasks.length > 0) parts.push('待办' + tasks.length + '项');
+      if (english.length > 0) parts.push('英语' + english.length + '项');
+      if (workouts.length > 0) parts.push('健身' + workouts.length + '项');
+      body = '今日待完成：' + parts.join('，') + '。打开APP开始吧！';
+    }
+    
+    try {
+      new Notification('无量空处 - 每日提醒', {
+        body: body,
+        icon: 'icon.jpg',
+        badge: 'icon.jpg'
+      });
+    } catch(e) {
+      console.log('通知发送失败:', e);
+    }
+  });
 }
 
 function loadStorageInfo() {
