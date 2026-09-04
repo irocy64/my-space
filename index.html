@@ -281,6 +281,22 @@ body::before {
 }
 .page-date { font-size: 12px; color: var(--text-light); }
 .topbar-actions { margin-left: auto; }
+.topbar-search-btn {
+  background: none;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-light);
+  font-size: 16px;
+  padding: 6px 10px;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.2s;
+}
+.topbar-search-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(79,195,247,0.05);
+}
 .btn-primary {
   padding: 8px 18px;
   background: linear-gradient(135deg, rgba(79,195,247,0.15), rgba(124,77,255,0.15));
@@ -2377,6 +2393,61 @@ body::before {
   line-height: 1.6;
 }
 
+/* ===== Global Search ===== */
+.global-search-box input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+  box-sizing: border-box;
+}
+.global-search-box input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79,195,247,0.1);
+}
+.global-search-results {
+  margin-top: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.search-group {
+  margin-bottom: 12px;
+}
+.search-group-title {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.search-result-item {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.15s;
+}
+.search-result-item:hover {
+  background: rgba(79,195,247,0.08);
+}
+.search-result-title {
+  font-size: 13px;
+  color: var(--text);
+  flex: 1;
+}
+.search-result-date {
+  font-size: 11px;
+  color: var(--text-light);
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -2883,6 +2954,7 @@ body::before {
       <span class="page-title" id="pageTitle">首页总览</span>
       <span class="page-date" id="pageDate"></span>
       <div class="topbar-actions" id="topbarActions"></div>
+      <button class="topbar-search-btn" id="globalSearchBtn" title="全局搜索 (Ctrl+F)">🔍</button>
     </header>
     <main class="content" id="content">
       <!-- 10 pages will be rendered by JS -->
@@ -10580,6 +10652,133 @@ async function callAiApi(messages) {
   return callDoubaoApi(messages);
 }
 
+// ===== 全局搜索 =====
+function openGlobalSearch() {
+  openModal({
+    title: '🔍 全局搜索',
+    bodyHTML:
+      '<div class="global-search-box">' +
+        '<input type="text" id="globalSearchInput" placeholder="搜索待办、实验、笔记、视频、书籍..." autofocus>' +
+      '</div>' +
+      '<div id="globalSearchResults" class="global-search-results">' +
+        '<div style="text-align:center;color:var(--text-light);padding:30px;">输入关键词开始搜索</div>' +
+      '</div>',
+    confirmText: '关闭',
+    hideConfirm: true,
+    onConfirm: function() { return true; }
+  });
+
+  setTimeout(function() {
+    const input = document.getElementById('globalSearchInput');
+    if (input) input.focus();
+    let searchTimer = null;
+    input.addEventListener('input', function() {
+      clearTimeout(searchTimer);
+      const query = this.value.trim().toLowerCase();
+      if (!query) {
+        document.getElementById('globalSearchResults').innerHTML =
+          '<div style="text-align:center;color:var(--text-light);padding:30px;">输入关键词开始搜索</div>';
+        return;
+      }
+      searchTimer = setTimeout(function() { doGlobalSearch(query); }, 300);
+    });
+    // 回车关闭
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') document.querySelector('.modal-close').click();
+    });
+  }, 100);
+}
+
+async function doGlobalSearch(query) {
+  const resultsDiv = document.getElementById('globalSearchResults');
+  resultsDiv.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:30px;">搜索中...</div>';
+
+  const results = [];
+  const moduleLabels = {
+    tasks: '📋 待办', media: '🎬 自媒体', english: '📚 英语',
+    experiments: '🧪 实验', workouts: '💪 健身', meals: '🍽️ 饮食',
+    games: '🎮 游戏', books: '📖 读书', bookNotes: '📝 读书笔记',
+    schedule: '📅 课程', academics: '🎓 学业', reagents: '🧫 试剂',
+    literature: '📄 文献', memo: '💡 备忘'
+  };
+
+  // 搜索各个store
+  const storesToSearch = ['tasks', 'media', 'english', 'experiments', 'workouts', 'meals', 'games', 'books', 'bookNotes', 'schedule', 'academics', 'reagents', 'literature', 'memo'];
+
+  for (const store of storesToSearch) {
+    try {
+      const items = await dbGetAll(store);
+      items.forEach(function(item) {
+        // 搜索所有文本字段
+        const text = JSON.stringify(item).toLowerCase();
+        if (text.includes(query)) {
+          // 提取标题
+          let title = item.title || item.name || item.foods || item.subject || item.course || item.experimentName || item.idea || '';
+          if (!title) title = item.content || item.notes || item.description || '(无标题)';
+          if (title.length > 50) title = title.slice(0, 50) + '...';
+
+          // 提取日期
+          let date = item.date || item.publishDate || item.createdAt || '';
+          if (date && typeof date === 'number') date = new Date(date).toLocaleDateString();
+
+          results.push({
+            module: store,
+            moduleLabel: moduleLabels[store] || store,
+            title: title,
+            date: date,
+            id: item.id,
+            item: item
+          });
+        }
+      });
+    } catch(e) { /* 忽略不存在的store */ }
+  }
+
+  if (results.length === 0) {
+    resultsDiv.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:30px;">未找到相关内容</div>';
+    return;
+  }
+
+  // 按模块分组显示
+  const grouped = {};
+  results.forEach(function(r) {
+    if (!grouped[r.module]) grouped[r.module] = [];
+    grouped[r.module].push(r);
+  });
+
+  let html = '<div style="font-size:12px;color:var(--text-light);margin-bottom:10px;">找到 ' + results.length + ' 条结果</div>';
+  for (const mod in grouped) {
+    html += '<div class="search-group">' +
+      '<div class="search-group-title">' + grouped[mod][0].moduleLabel + ' (' + grouped[mod].length + ')</div>' +
+      grouped[mod].map(function(r) {
+        return '<div class="search-result-item" data-module="' + r.module + '" data-id="' + r.id + '">' +
+          '<span class="search-result-title">' + escapeHtml(r.title) + '</span>' +
+          (r.date ? '<span class="search-result-date">' + r.date + '</span>' : '') +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+  resultsDiv.innerHTML = html;
+
+  // 绑定点击跳转
+  resultsDiv.querySelectorAll('.search-result-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      const module = item.dataset.module;
+      // 映射到导航模块
+      const navMap = {
+        tasks: 'tasks', media: 'media', english: 'english', experiments: 'experiments',
+        workouts: 'workouts', meals: 'meals', games: 'games', books: 'books',
+        bookNotes: 'books', schedule: 'schedule', academics: 'academics',
+        reagents: 'experiments', literature: 'experiments', memo: 'tasks'
+      };
+      const target = navMap[module] || 'home';
+      App.navigateTo(target);
+      document.querySelector('.modal-close').click();
+      showToast('已跳转到' + (moduleLabels[module] || module), 'success');
+    });
+  });
+}
+
 async function sendAiMessage(text) {
   if (!text.trim()) return;
   if (!aiApiKey) {
@@ -10925,6 +11124,16 @@ function initAiAssistant() {
 function init() {
   // Set date
   document.getElementById('pageDate').textContent = formatDateCN(todayStr());
+  // 全局搜索按钮
+  const searchBtn = document.getElementById('globalSearchBtn');
+  if (searchBtn) searchBtn.addEventListener('click', openGlobalSearch);
+  // Ctrl+F 快捷键打开搜索
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      e.preventDefault();
+      openGlobalSearch();
+    }
+  });
   // 咒力粒子背景
   initCurseParticles();
   // Nav clicks (事件委托，支持动态渲染)
