@@ -10515,32 +10515,54 @@ async function callDoubaoApi(messages) {
   } else {
     body.thinking = { type: 'disabled' };
   }
-  const res = await fetch(AI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + aiApiKey
-    },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    let friendlyMsg = 'API 错误 ' + res.status;
-    if (res.status === 401) friendlyMsg = 'API Key 无效或已过期，请在设置中检查';
-    else if (res.status === 404) friendlyMsg = '模型不存在或已下线，请检查模型名称';
-    else if (res.status === 429) friendlyMsg = '请求过于频繁，请稍后再试';
-    else if (res.status === 500) friendlyMsg = '服务器内部错误，请稍后再试';
-    else if (errText.includes('ModelNotOpen')) friendlyMsg = '模型未开通，请在火山引擎控制台开通该模型';
-    else if (errText.includes('InsufficientBalance')) friendlyMsg = '账户余额不足，请充值';
-    throw new Error(friendlyMsg + '：' + errText.slice(0, 100));
+
+  // 自动重试：最多2次尝试
+  let lastError = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(AI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + aiApiKey
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        // 5xx错误或429限流，自动重试
+        if ((res.status >= 500 || res.status === 429) && attempt < 2) {
+          lastError = new Error('API ' + res.status);
+          await new Promise(r => setTimeout(r, 1500)); // 等待1.5秒重试
+          continue;
+        }
+        let friendlyMsg = 'API 错误 ' + res.status;
+        if (res.status === 401) friendlyMsg = 'API Key 无效或已过期，请在设置中检查';
+        else if (res.status === 404) friendlyMsg = '模型不存在或已下线，请检查模型名称';
+        else if (res.status === 429) friendlyMsg = '请求过于频繁，请稍后再试';
+        else if (res.status === 500) friendlyMsg = '服务器内部错误，请稍后再试';
+        else if (errText.includes('ModelNotOpen')) friendlyMsg = '模型未开通，请在火山引擎控制台开通该模型';
+        else if (errText.includes('InsufficientBalance')) friendlyMsg = '账户余额不足，请充值';
+        throw new Error(friendlyMsg + '：' + errText.slice(0, 100));
+      }
+      const data = await res.json();
+      const msg = data.choices[0].message;
+      // 如果有思考内容，拼接到回复前面
+      if (msg.reasoning_content && msg.reasoning_content.trim()) {
+        return '💭 思考过程：\n' + msg.reasoning_content + '\n\n---\n\n' + msg.content;
+      }
+      return msg.content;
+    } catch (err) {
+      lastError = err;
+      // 网络错误（Failed to fetch等），自动重试
+      if (attempt < 2 && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('timeout'))) {
+        await new Promise(r => setTimeout(r, 2000)); // 等待2秒重试
+        continue;
+      }
+      throw err;
+    }
   }
-  const data = await res.json();
-  const msg = data.choices[0].message;
-  // 如果有思考内容，拼接到回复前面
-  if (msg.reasoning_content && msg.reasoning_content.trim()) {
-    return '💭 思考过程：\n' + msg.reasoning_content + '\n\n---\n\n' + msg.content;
-  }
-  return msg.content;
+  throw lastError || new Error('AI请求失败');
 }
 
 // callAiApi 是 callDoubaoApi 的别名，保持兼容
