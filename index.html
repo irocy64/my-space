@@ -7691,6 +7691,81 @@ async function saveBookPlanToDB(data, bookTitle, bookAuthor) {
   return { total: total, moduleId: readingModule.id };
 }
 
+// 读书计划预览/编辑界面
+function showBookPlanPreview(data, bookTitle, bookAuthor, rawReply) {
+  let daysHtml = '';
+  data.plan.forEach(function(dayPlan, dayIdx) {
+    daysHtml += '<div class="book-day-card" data-day="' + dayIdx + '" style="margin-bottom:12px;padding:12px;background:rgba(255,255,255,0.02);border-radius:10px;border:1px solid var(--border);">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+        '<span style="font-weight:600;font-size:14px;">第 ' + (dayIdx + 1) + ' 天</span>' +
+        '<button class="book-day-del" data-day="' + dayIdx + '" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:12px;">删除</button>' +
+      '</div>' +
+      '<textarea class="book-day-content" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;resize:vertical;min-height:60px;" placeholder="阅读内容/章节/页数">' + escapeHtml(dayPlan.content || '') + '</textarea>' +
+    '</div>';
+  });
+  
+  const warning = data.plan.length < 3 ? '<div style="background:rgba(255,165,0,0.1);border:1px solid orange;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:orange;">⚠️ 警告：AI只返回了 ' + data.plan.length + ' 天计划，可能不完整。</div>' : '';
+  
+  openModal({
+    title: '📖 阅读计划预览（《' + bookTitle + '》共' + data.plan.length + '天）',
+    bodyHTML: warning +
+      '<div style="max-height:450px;overflow-y:auto;padding-right:8px;">' + daysHtml + '</div>' +
+      '<div style="margin-top:12px;">' +
+        '<button id="toggleBookRawReply" style="font-size:12px;color:var(--text-light);background:none;border:none;cursor:pointer;text-decoration:underline;">📋 查看AI原始回复（调试用）</button>' +
+        '<div id="bookRawReplyContent" style="display:none;margin-top:8px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:150px;overflow-y:auto;">' + escapeHtml(rawReply || '') + '</div>' +
+      '</div>',
+    confirmText: '确认导入',
+    cancelText: '取消',
+    onConfirm: async function() {
+      const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
+      const scope = modal || document;
+      if (!scope) return true;
+      const newPlan = [];
+      scope.querySelectorAll('.book-day-card').forEach(function(card) {
+        const content = card.querySelector('.book-day-content').value.trim();
+        if (content) {
+          newPlan.push({ day: newPlan.length + 1, content: content });
+        }
+      });
+      if (newPlan.length === 0) {
+        showToast('没有可导入的阅读计划', 'error');
+        return false;
+      }
+      const result = await saveBookPlanToDB({ plan: newPlan }, bookTitle, bookAuthor);
+      showToast('已导入 ' + result.total + ' 天阅读计划', 'success');
+      if (typeof renderSidebar === 'function') renderSidebar();
+      setTimeout(function() { navigateTo(result.moduleId); }, 500);
+      return true;
+    }
+  });
+  
+  // 绑定事件
+  setTimeout(function() {
+    const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
+    const scope = modal || document;
+    if (!scope) return;
+    
+    const toggleBtn = scope.querySelector('#toggleBookRawReply');
+    const rawContent = scope.querySelector('#bookRawReplyContent');
+    if (toggleBtn && rawContent) {
+      toggleBtn.addEventListener('click', function() {
+        rawContent.style.display = rawContent.style.display === 'none' ? 'block' : 'none';
+      });
+    }
+    
+    scope.querySelectorAll('.book-day-del').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.closest('.book-day-card').remove();
+        const cards = scope.querySelectorAll('.book-day-card');
+        cards.forEach(function(card, idx) {
+          const title = card.querySelector('span');
+          if (title) title.textContent = '第 ' + (idx + 1) + ' 天';
+        });
+      });
+    });
+  }, 100);
+}
+
 async function generateBookAiPlan(title, author, days, time) {
   if (!aiApiKey) { showToast('请先在设置中配置 API Key', 'error'); return; }
   showToast('AI 正在生成阅读计划...', 'info');
@@ -7746,11 +7821,8 @@ JSON格式：
       }, 100);
       return;
     }
-    const result = await saveBookPlanToDB(data, title, author);
-    showToast('已生成 ' + result.total + ' 天阅读计划，已创建「阅读计划」模块', 'success');
-    renderBooks();
-    if (typeof renderSidebar === 'function') renderSidebar();
-    setTimeout(function() { navigateTo(result.moduleId); }, 800);
+    // 显示预览/编辑界面
+    showBookPlanPreview(data, title, author, reply);
   } catch(err) {
     console.error('阅读计划生成失败', err);
     showToast('生成失败：' + err.message, 'error');
@@ -8807,9 +8879,8 @@ async function saveAiToModule(module, content) {
       // 尝试解析为阅读计划
       const planData = parseBookPlanFromText(content);
       if (planData && planData.plan && planData.plan.length > 0) {
-        const result = await saveBookPlanToDB(planData, 'AI生成书单', '');
-        showToast('已解析并保存 ' + result.total + ' 天阅读计划', 'success');
-        if (typeof renderSidebar === 'function') renderSidebar();
+        // 显示预览/编辑界面
+        showBookPlanPreview(planData, 'AI生成书单', '', content);
       } else {
         // 不是计划格式，存为一本书
         await dbAdd('books', {
