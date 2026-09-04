@@ -8410,7 +8410,7 @@ async function callDoubaoApi(messages) {
     model: AI_MODEL,
     messages: messages,
     temperature: 0.7,
-    max_tokens: 1024
+    max_tokens: 4096
   };
   if (window._aiThinkingEnabled) {
     body.thinking = { type: 'enabled' };
@@ -8470,7 +8470,7 @@ async function sendAiMessage(text) {
       model: AI_MODEL,
       messages: aiConversation,
       temperature: 0.7,
-      max_tokens: 1024,
+      max_tokens: 4096,
       stream: true
     };
     if (window._aiThinkingEnabled) {
@@ -8639,8 +8639,8 @@ async function saveAiToModule(module, content) {
       // 尝试解析为结构化训练计划
       const planData = parseWorkoutPlanFromText(content);
       if (planData && planData.plan && planData.plan.length > 0) {
-        const total = await saveWorkoutPlanToDB(planData);
-        showToast('已解析并保存 ' + total + ' 次训练到健身模块', 'success');
+        // 显示预览/编辑界面
+        showWorkoutPlanPreview(planData, content);
       } else {
         // 不是计划格式，存为一条训练记录
         await dbAdd('workouts', {
