@@ -2448,6 +2448,31 @@ body::before {
   margin-left: 10px;
 }
 
+/* ===== Media Stats ===== */
+.media-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.media-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+}
+.media-stat-card .stat-num {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.media-stat-card .stat-label {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -5228,9 +5253,20 @@ function renderMediaData() {
     const recent = published.slice(0, 7);
     const maxViews = Math.max.apply(null, recent.map(function(m) { return m.views || 0; }).concat([1]));
 
+    const totalViews = published.reduce(function(s, m) { return s + (m.views || 0); }, 0);
+    const totalLikes = published.reduce(function(s, m) { return s + (m.likes || 0); }, 0);
+    const totalComments = published.reduce(function(s, m) { return s + (m.comments || 0); }, 0);
+    const avgViews = published.length > 0 ? Math.round(totalViews / published.length) : 0;
+
     let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
       '<div style="font-size:16px;font-weight:600;">📊 数据看板</div>' +
       '<button class="btn-primary" id="mediaImportBtn" style="padding:8px 16px;font-size:13px;">📥 抖音分享导入</button>' +
+    '</div>' +
+    '<div class="media-stats-grid">' +
+      '<div class="media-stat-card"><div class="stat-num">' + totalViews + '</div><div class="stat-label">总播放</div></div>' +
+      '<div class="media-stat-card"><div class="stat-num">' + totalLikes + '</div><div class="stat-label">总点赞</div></div>' +
+      '<div class="media-stat-card"><div class="stat-num">' + totalComments + '</div><div class="stat-label">总评论</div></div>' +
+      '<div class="media-stat-card"><div class="stat-num">' + avgViews + '</div><div class="stat-label">平均播放</div></div>' +
     '</div>' +
     '<div class="media-chart-card">' +
       '<div class="chart-title">📈 最近发布视频播放量</div>' +
