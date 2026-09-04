@@ -2312,9 +2312,92 @@ body::before {
 .ai-settings-row { display: flex; gap: 10px; align-items: center; padding: 10px 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-light); }
 .ai-settings-row input { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--text); font-size: 12px; }
 .ai-settings-row button { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--primary); background: none; color: var(--primary); font-size: 12px; cursor: pointer; }
+
+/* 移动端响应式 */
+.mobile-menu-btn {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-solid);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 49;
+}
+@media (max-width: 768px) {
+  .mobile-menu-btn { display: flex; }
+  .sidebar-overlay.active { display: block; }
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 50;
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .main-content {
+    margin-left: 0 !important;
+    padding: 60px 12px 20px 12px !important;
+  }
+  .page-header { padding-left: 0 !important; }
+  .english-stats, .workout-stats {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .english-stat-card, .workout-stat-card { padding: 10px !important; }
+  .english-stat-card .num, .workout-stat-card .num { font-size: 20px !important; }
+  .week-calendar, .workout-week-calendar {
+    gap: 4px !important;
+  }
+  .week-day-cell, .workout-day-cell {
+    min-height: 60px !important;
+    padding: 6px 4px !important;
+  }
+  .tasks-header { flex-direction: column; gap: 8px; }
+  .task-input { width: 100%; }
+  .ai-schedule-card { flex-direction: column; gap: 10px; text-align: center; }
+  .modal { width: 95% !important; max-width: 95% !important; margin: 10px auto !important; }
+  .modal-body { padding: 16px !important; max-height: 70vh !important; }
+  .ai-modal { width: 95% !important; right: 2.5% !important; left: 2.5% !important; }
+  .books-tabs { flex-wrap: wrap; }
+  .exercise-input-row { flex-wrap: wrap; gap: 4px; }
+  .exercise-input-row input { flex: 1 1 45%; min-width: 0; }
+  .home-stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .module-stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .settings-btn-row { flex-direction: column; }
+  .settings-btn { width: 100%; }
+}
+@media (max-width: 480px) {
+  .english-stats, .workout-stats {
+    grid-template-columns: 1fr !important;
+  }
+  .week-day-cell .day-num, .workout-day-cell .day-num { font-size: 14px !important; }
+  .week-day-cell .day-mark, .workout-day-cell .day-mark { font-size: 9px !important; }
+  .ai-quick-btns { flex-wrap: wrap; }
+  .ai-quick-btn { flex: 1 1 45%; font-size: 11px; padding: 8px 6px; }
+}
 </style>
 </head>
 <body>
+
+<div class="mobile-menu-btn" id="mobileMenuBtn">☰</div>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
 <div class="app">
   <!-- Sidebar -->
@@ -8556,8 +8639,27 @@ function init() {
   // Nav clicks (事件委托，支持动态渲染)
   document.getElementById('navList').addEventListener('click', function(e) {
     const item = e.target.closest('.nav-item');
-    if (item) navigateTo(item.dataset.page);
+    if (item) {
+      navigateTo(item.dataset.page);
+      // 移动端点击导航后关闭侧边栏
+      closeMobileSidebar();
+    }
   });
+  // 移动端菜单
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+  const sidebar = document.querySelector('.sidebar');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  if (mobileMenuBtn && sidebar && sidebarOverlay) {
+    mobileMenuBtn.addEventListener('click', function() {
+      sidebar.classList.toggle('open');
+      sidebarOverlay.classList.toggle('active');
+    });
+    sidebarOverlay.addEventListener('click', closeMobileSidebar);
+  }
+  function closeMobileSidebar() {
+    if (sidebar) sidebar.classList.remove('open');
+    if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+  }
   // Init DB then render home
   initDB().then(function() {
     return loadModuleConfig();
