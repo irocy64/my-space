@@ -3769,7 +3769,6 @@ JSON格式：
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
     const schedule = parseScheduleFromText(reply);
     if (!schedule || schedule.length === 0) {
-      console.log('AI原始回复:', reply);
       openModal({
         title: 'AI 返回内容（无法自动解析）',
         bodyHTML: '<div style="max-height:400px;overflow-y:auto;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">' + escapeHtml(reply) + '</div>',
@@ -5032,7 +5031,6 @@ JSON格式如下：
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
     const data = parseEnglishPlanFromText(reply);
     if (!data || !data.plan || !Array.isArray(data.plan) || data.plan.length === 0) {
-      console.log('AI原始回复:', reply);
       // 显示AI原始回复，让用户看到并选择
       openModal({
         title: 'AI 返回内容（无法自动解析）',
@@ -6270,7 +6268,6 @@ JSON格式示例（必须严格遵循，包含${totalDays}天）：
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
     const data = parseWorkoutPlanFromText(reply);
     if (!data || !data.plan || data.plan.length === 0) {
-      console.log('AI原始回复:', reply);
       openModal({
         title: 'AI 返回内容（无法自动解析）',
         bodyHTML:
@@ -7578,7 +7575,6 @@ JSON格式：
     const reply = await callDoubaoApi([{ role: 'user', content: prompt }]);
     const data = parseBookPlanFromText(reply);
     if (!data || !data.plan || data.plan.length === 0) {
-      console.log('AI原始回复:', reply);
       openModal({
         title: 'AI 返回内容（无法自动解析）',
         bodyHTML:
@@ -8511,7 +8507,6 @@ async function sendAiMessage(text) {
       const { done, value } = await reader.read();
       if (done) break;
       const chunk = decoder.decode(value, { stream: true });
-      console.log('[AI Stream] chunk:', chunk.slice(0, 200));
       buffer += chunk;
       // 按行分割，保留不完整的行在缓冲区
       const lines = buffer.split('\n');
