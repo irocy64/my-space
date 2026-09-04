@@ -1,5 +1,5 @@
-// Service Worker - 离线缓存
-const CACHE_NAME = 'my-space-v1';
+// Service Worker - 离线缓存 v2
+const CACHE_NAME = 'my-space-v2';
 const CORE_ASSETS = [
   './index.html',
   './manifest.json',
@@ -34,14 +34,42 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// 请求拦截：缓存优先，网络回退，成功后更新缓存
+// 请求拦截
 self.addEventListener('fetch', function(event) {
-  // 只处理 GET 请求
   if (event.request.method !== 'GET') return;
 
+  const url = new URL(event.request.url);
+
+  // API请求不缓存，直接走网络
+  if (url.hostname.includes('volces.com') || url.pathname.includes('/api/')) {
+    event.respondWith(fetch(event.request).catch(function() {
+      return new Response(JSON.stringify({ error: '网络请求失败' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }));
+    return;
+  }
+
+  // 导航请求：网络优先，失败回退缓存
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then(function(networkResponse) {
+        const clone = networkResponse.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(event.request, clone);
+        });
+        return networkResponse;
+      }).catch(function() {
+        return caches.match('./index.html');
+      })
+    );
+    return;
+  }
+
+  // 静态资源：缓存优先，后台更新
   event.respondWith(
     caches.match(event.request).then(function(cachedResponse) {
-      // 缓存命中，直接返回，同时后台更新缓存
       if (cachedResponse) {
         fetch(event.request).then(function(networkResponse) {
           if (networkResponse && networkResponse.status === 200) {
@@ -53,8 +81,6 @@ self.addEventListener('fetch', function(event) {
         }).catch(function() {});
         return cachedResponse;
       }
-
-      // 缓存未命中，走网络，成功后存入缓存
       return fetch(event.request).then(function(networkResponse) {
         if (!networkResponse || networkResponse.status !== 200 || networkResponse.type === 'opaque') {
           return networkResponse;
@@ -65,10 +91,6 @@ self.addEventListener('fetch', function(event) {
         });
         return networkResponse;
       }).catch(function() {
-        // 离线且无缓存，返回首页（单页应用）
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
         return new Response('离线状态，暂无缓存', { status: 503 });
       });
     })
