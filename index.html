@@ -9002,6 +9002,32 @@ window.addEventListener('beforeunload', function() {
   if (window._reminderInterval) clearInterval(window._reminderInterval);
 });
 
+// 全局快捷键
+document.addEventListener('keydown', function(e) {
+  // Ctrl+K 聚焦搜索框
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    const searchInput = document.getElementById('homeSearchInput');
+    if (searchInput) {
+      navigateTo('home');
+      setTimeout(function() { searchInput.focus(); }, 100);
+    }
+  }
+  // Esc 关闭弹窗
+  if (e.key === 'Escape') {
+    const modal = document.querySelector('.modal');
+    if (modal && modal.style.display !== 'none') {
+      const closeBtn = modal.querySelector('.modal-close, [onclick*="closeModal"]');
+      if (closeBtn) closeBtn.click();
+    }
+    // 关闭AI助手
+    const aiModal = document.getElementById('aiModal');
+    if (aiModal && aiModal.classList.contains('open')) {
+      closeAiModal();
+    }
+  }
+});
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
