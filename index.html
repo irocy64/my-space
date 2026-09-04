@@ -4791,9 +4791,7 @@ function showEnglishAiPlanForm() {
         confirmBtn.disabled = true;
         confirmBtn.style.opacity = '0.6';
       }
-      generateEnglishAiPlan(goal, days, hours).then(function() {
-        closeModal();
-      }).catch(function() {
+      generateEnglishAiPlan(goal, days, hours).catch(function() {
         if (confirmBtn) {
           confirmBtn.textContent = '开始生成';
           confirmBtn.disabled = false;
@@ -7600,9 +7598,7 @@ function showBookAiPlanForm() {
         confirmBtn.disabled = true;
         confirmBtn.style.opacity = '0.6';
       }
-      generateBookAiPlan(title, author, days, time).then(function() {
-        closeModal();
-      }).catch(function() {
+      generateBookAiPlan(title, author, days, time).catch(function() {
         if (confirmBtn) {
           confirmBtn.textContent = '开始生成';
           confirmBtn.disabled = false;
