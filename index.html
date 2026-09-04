@@ -8429,7 +8429,14 @@ async function callDoubaoApi(messages) {
   });
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error('API 错误 ' + res.status + ': ' + errText.slice(0, 200));
+    let friendlyMsg = 'API 错误 ' + res.status;
+    if (res.status === 401) friendlyMsg = 'API Key 无效或已过期，请在设置中检查';
+    else if (res.status === 404) friendlyMsg = '模型不存在或已下线，请检查模型名称';
+    else if (res.status === 429) friendlyMsg = '请求过于频繁，请稍后再试';
+    else if (res.status === 500) friendlyMsg = '服务器内部错误，请稍后再试';
+    else if (errText.includes('ModelNotOpen')) friendlyMsg = '模型未开通，请在火山引擎控制台开通该模型';
+    else if (errText.includes('InsufficientBalance')) friendlyMsg = '账户余额不足，请充值';
+    throw new Error(friendlyMsg + '：' + errText.slice(0, 100));
   }
   const data = await res.json();
   const msg = data.choices[0].message;
@@ -8496,7 +8503,14 @@ async function sendAiMessage(text) {
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error('API 错误 ' + res.status + ': ' + errText.slice(0, 200));
+      let friendlyMsg = 'API 错误 ' + res.status;
+      if (res.status === 401) friendlyMsg = 'API Key 无效或已过期，请在设置中检查';
+      else if (res.status === 404) friendlyMsg = '模型不存在或已下线，请检查模型名称';
+      else if (res.status === 429) friendlyMsg = '请求过于频繁，请稍后再试';
+      else if (res.status === 500) friendlyMsg = '服务器内部错误，请稍后再试';
+      else if (errText.includes('ModelNotOpen')) friendlyMsg = '模型未开通，请在火山引擎控制台开通该模型';
+      else if (errText.includes('InsufficientBalance')) friendlyMsg = '账户余额不足，请充值';
+      throw new Error(friendlyMsg + '：' + errText.slice(0, 100));
     }
 
     const reader = res.body.getReader();
