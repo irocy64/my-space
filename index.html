@@ -6305,7 +6305,7 @@ JSON格式示例（必须严格遵循，包含${totalDays}天）：
       return;
     }
     // 解析成功，先显示预览/编辑界面
-    showWorkoutPlanPreview(data);
+    showWorkoutPlanPreview(data, reply);
   } catch(err) {
     console.error('健身计划生成失败', err);
     showToast('生成失败：' + err.message, 'error');
@@ -6313,12 +6313,18 @@ JSON格式示例（必须严格遵循，包含${totalDays}天）：
 }
 
 // 健身计划预览/编辑模态框
-function showWorkoutPlanPreview(data) {
+function showWorkoutPlanPreview(data, rawReply) {
   let planHTML = '<div style="max-height:500px;overflow-y:auto;">';
   planHTML += '<div style="margin-bottom:12px;font-size:13px;color:var(--text-light);">共 ' + data.plan.length + ' 天训练计划，可直接修改内容，确认后导入：</div>';
   
+  // 如果天数少于预期，显示警告
+  if (data.plan.length < 3) {
+    planHTML += '<div style="margin-bottom:12px;padding:10px;background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.3);border-radius:8px;font-size:12px;color:#ff9800;">⚠️ AI只返回了' + data.plan.length + '天计划，可能不完整。可查看下方AI原始回复，或点击"重新生成"。</div>';
+  }
+  
   data.plan.forEach(function(dayPlan, idx) {
-    const exercisesHTML = (dayPlan.exercises || []).map(function(ex, exIdx) {
+    const exercises = dayPlan.exercises || [];
+    let exercisesHTML = exercises.map(function(ex, exIdx) {
       return '<div class="exercise-input-row" data-day="' + idx + '" data-ex="' + exIdx + '" style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">' +
         '<input type="text" class="ex-name" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;" placeholder="动作名" value="' + escapeHtml(ex.name || '') + '">' +
         '<input type="number" class="ex-sets" style="width:50px;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;" placeholder="组" value="' + (ex.sets || 3) + '">' +
@@ -6327,7 +6333,11 @@ function showWorkoutPlanPreview(data) {
       '</div>';
     }).join('');
     
-    planHTML += '<div style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.02);">' +
+    if (exercises.length === 0) {
+      exercisesHTML = '<div style="font-size:12px;color:var(--text-light);padding:8px;text-align:center;">暂无动作，点击「+动作」添加</div>';
+    }
+    
+    planHTML += '<div class="day-plan-card" style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.02);">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">' +
         '<span style="font-weight:600;color:var(--primary);">第 ' + dayPlan.day + ' 天</span>' +
         '<input type="text" class="day-muscle" data-day="' + idx + '" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:13px;" value="' + escapeHtml(dayPlan.muscleGroup || '综合训练') + '">' +
@@ -6337,6 +6347,14 @@ function showWorkoutPlanPreview(data) {
       '<div class="exercises-list">' + exercisesHTML + '</div>' +
     '</div>';
   });
+  
+  // 添加AI原始回复（可折叠）
+  if (rawReply) {
+    planHTML += '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px;">' +
+      '<button id="toggleRawReply" style="background:none;border:none;color:var(--text-light);font-size:12px;cursor:pointer;text-decoration:underline;">📋 查看AI原始回复（调试用）</button>' +
+      '<div id="rawReplyContent" style="display:none;margin-top:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;color:var(--text-light);">' + escapeHtml(rawReply) + '</div>' +
+    '</div>';
+  }
   planHTML += '</div>';
   
   openModal({
@@ -6346,12 +6364,12 @@ function showWorkoutPlanPreview(data) {
       { text: '取消', close: true },
       { text: '确认导入', class: 'btn-primary', action: function() {
         // 收集编辑后的数据
-        const modal = document.querySelector('.modal.show, .modal.active');
-        const dayCards = modal ? modal.querySelectorAll('[style*="margin-bottom:16px;padding:12px"]') : [];
+        const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
+        const scope = modal || document;
         const newPlan = [];
         data.plan.forEach(function(dayPlan, idx) {
-          const muscleInput = modal ? modal.querySelector('.day-muscle[data-day="' + idx + '"]') : null;
-          const exRows = modal ? modal.querySelectorAll('.exercise-input-row[data-day="' + idx + '"]') : [];
+          const muscleInput = scope.querySelector('.day-muscle[data-day="' + idx + '"]');
+          const exRows = scope.querySelectorAll('.exercise-input-row[data-day="' + idx + '"]');
           const exercises = [];
           exRows.forEach(function(row) {
             const name = row.querySelector('.ex-name') ? row.querySelector('.ex-name').value.trim() : '';
@@ -6359,10 +6377,11 @@ function showWorkoutPlanPreview(data) {
             const reps = row.querySelector('.ex-reps') ? row.querySelector('.ex-reps').value.trim() : '12';
             if (name) exercises.push({ name: name, weight: null, sets: sets, reps: reps, notes: '' });
           });
-          if (exercises.length > 0 || (muscleInput && muscleInput.value)) {
+          const muscle = muscleInput ? muscleInput.value.trim() : (dayPlan.muscleGroup || '综合训练');
+          if (muscle || exercises.length > 0) {
             newPlan.push({
               day: dayPlan.day,
-              muscleGroup: muscleInput ? muscleInput.value.trim() : dayPlan.muscleGroup,
+              muscleGroup: muscle || '综合训练',
               duration: 60,
               exercises: exercises,
               notes: ''
@@ -6385,12 +6404,22 @@ function showWorkoutPlanPreview(data) {
   
   // 绑定添加/删除动作和删除天的事件
   setTimeout(function() {
-    const modal = document.querySelector('.modal.show, .modal.active');
-    if (!modal) return;
-    modal.querySelectorAll('.add-ex-btn').forEach(function(btn) {
+    const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
+    const scope = modal || document;
+    if (!scope) return;
+    
+    // 查看AI原始回复折叠
+    const toggleBtn = scope.querySelector('#toggleRawReply');
+    const rawContent = scope.querySelector('#rawReplyContent');
+    if (toggleBtn && rawContent) {
+      toggleBtn.addEventListener('click', function() {
+        rawContent.style.display = rawContent.style.display === 'none' ? 'block' : 'none';
+      });
+    }
+    
+    scope.querySelectorAll('.add-ex-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         const dayIdx = this.dataset.day;
-        const list = modal.querySelector('.exercises-list');
         const row = document.createElement('div');
         row.className = 'exercise-input-row';
         row.dataset.day = dayIdx;
@@ -6399,19 +6428,19 @@ function showWorkoutPlanPreview(data) {
           '<input type="number" class="ex-sets" style="width:50px;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;" placeholder="组" value="3">' +
           '<input type="text" class="ex-reps" style="width:60px;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;" placeholder="次" value="12">' +
           '<button class="remove-ex-btn" style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:16px;padding:2px 6px;">×</button>';
-        const dayCard = this.closest('[style*="margin-bottom:16px"]');
+        const dayCard = this.closest('.day-plan-card');
         if (dayCard) dayCard.querySelector('.exercises-list').appendChild(row);
         row.querySelector('.remove-ex-btn').addEventListener('click', function() { row.remove(); });
       });
     });
-    modal.querySelectorAll('.remove-ex-btn').forEach(function(btn) {
+    scope.querySelectorAll('.remove-ex-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         this.closest('.exercise-input-row').remove();
       });
     });
-    modal.querySelectorAll('.del-day-btn').forEach(function(btn) {
+    scope.querySelectorAll('.del-day-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        this.closest('[style*="margin-bottom:16px"]').remove();
+        this.closest('.day-plan-card').remove();
       });
     });
   }, 100);
