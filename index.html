@@ -2161,6 +2161,150 @@ body::before {
   line-height: 1.4;
 }
 
+/* ===== Experiment Subtabs ===== */
+.exp-subtabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.exp-subtab {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.exp-subtab.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ===== Literature ===== */
+.lit-list { display: flex; flex-direction: column; gap: 12px; }
+.lit-card {
+  padding: 14px 18px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--border-light);
+  transition: all 0.2s;
+}
+.lit-card:hover { border-color: var(--primary); transform: translateX(4px); }
+.lit-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.lit-meta { font-size: 12px; color: var(--text-light); margin-bottom: 6px; }
+.lit-summary { font-size: 12px; color: var(--c-literature); background: var(--purple-light); padding: 6px 10px; border-radius: 4px; margin-bottom: 6px; }
+
+/* ===== Reagents ===== */
+.reagent-list { display: flex; flex-direction: column; gap: 10px; }
+.reagent-card {
+  padding: 14px 18px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.reagent-card:hover { transform: translateX(4px); }
+.reagent-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.reagent-meta { font-size: 12px; color: var(--text-light); margin-bottom: 2px; }
+.reagent-expiry { font-size: 12px; font-weight: 600; margin-top: 4px; }
+.reagent-expiry.expired { color: #ff5252; }
+.reagent-expiry.warning { color: #ffb74d; }
+
+/* ===== Focus Mode ===== */
+.focus-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 2000;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+.focus-overlay.active { display: flex; }
+.focus-timer {
+  font-size: 120px;
+  font-weight: 700;
+  color: var(--primary);
+  text-shadow: 0 0 40px rgba(79,195,247,0.5);
+  margin-bottom: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.focus-label { font-size: 18px; color: var(--text-light); margin-bottom: 30px; }
+.focus-controls { display: flex; gap: 16px; }
+.focus-btn {
+  padding: 12px 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+.focus-btn:hover { border-color: var(--primary); background: var(--primary-light); }
+.focus-btn.primary { background: var(--primary); color: #000; border-color: var(--primary); }
+.focus-stats { margin-top: 30px; color: var(--text-light); font-size: 14px; }
+.focus-entry-btn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 12px;
+  background: linear-gradient(135deg, rgba(255,171,145,0.15), rgba(255,171,145,0.05));
+  border: 1px solid rgba(255,171,145,0.3);
+  border-radius: var(--radius);
+  color: #ffab91;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.focus-entry-btn:hover {
+  background: linear-gradient(135deg, rgba(255,171,145,0.25), rgba(255,171,145,0.1));
+  transform: translateY(-2px);
+}
+
+/* ===== Toggle Switch ===== */
+.settings-toggle-row {
+  margin: 12px 0;
+}
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.toggle-label input { display: none; }
+.toggle-slider {
+  width: 44px;
+  height: 24px;
+  background: var(--border);
+  border-radius: 12px;
+  position: relative;
+  transition: background 0.2s;
+}
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+.toggle-label input:checked + .toggle-slider {
+  background: var(--primary);
+}
+.toggle-label input:checked + .toggle-slider::after {
+  transform: translateX(20px);
+}
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -3404,6 +3548,7 @@ function renderHome() {
           '<button class="btn-primary" id="homeMemoSaveBtn" style="padding:4px 12px;font-size:12px;">💾 手动保存</button>' +
         '</div>' +
       '</div>' +
+      '<button class="focus-entry-btn" id="focusEntryBtn">🎯 晚间专注模式</button>' +
     '</div>' +
     '<div id="homeExamCountdown" style="margin-bottom:16px;"></div>' +
     '<div class="home-section-title" style="margin-bottom:12px;">📊 各模块动态</div>' +
@@ -3418,6 +3563,10 @@ function renderHome() {
   loadHomeProgress();
   loadHomeTimeline();
   loadExamCountdown();
+
+  // 专注模式按钮
+  const focusBtn = document.getElementById('focusEntryBtn');
+  if (focusBtn) focusBtn.onclick = openFocusMode;
 
   // 时间线添加事项按钮
   const timelineAddBtn = document.getElementById('homeTimelineAddBtn');
@@ -3679,6 +3828,133 @@ function loadExamCountdown() {
         '</div>';
       }).join('') + '</div>';
   });
+}
+
+// ===== 专注模式（番茄钟） =====
+let focusTimer = null;
+let focusSeconds = 0;
+let focusMode = 'work'; // work | break
+let focusTodayMinutes = 0;
+
+function openFocusMode() {
+  // 加载今日专注时长
+  dbGetAll('focusSessions').then(function(sessions) {
+    const today = todayStr();
+    focusTodayMinutes = sessions.filter(function(s) { return s.date === today; }).reduce(function(sum, s) { return sum + (s.minutes || 0); }, 0);
+    showFocusOverlay();
+  });
+}
+
+function showFocusOverlay() {
+  let overlay = document.getElementById('focusOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'focusOverlay';
+    overlay.className = 'focus-overlay';
+    overlay.innerHTML =
+      '<div class="focus-timer" id="focusTimer">25:00</div>' +
+      '<div class="focus-label" id="focusLabel">专注时间</div>' +
+      '<div class="focus-controls">' +
+        '<button class="focus-btn primary" id="focusStartBtn">开始</button>' +
+        '<button class="focus-btn" id="focusPauseBtn">暂停</button>' +
+        '<button class="focus-btn" id="focusResetBtn">重置</button>' +
+        '<button class="focus-btn" id="focusCloseBtn">退出</button>' +
+      '</div>' +
+      '<div class="focus-stats" id="focusStats">今日已专注 ' + focusTodayMinutes + ' 分钟</div>';
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.add('active');
+  focusSeconds = 25 * 60;
+  focusMode = 'work';
+  updateFocusDisplay();
+
+  document.getElementById('focusStartBtn').onclick = startFocus;
+  document.getElementById('focusPauseBtn').onclick = pauseFocus;
+  document.getElementById('focusResetBtn').onclick = resetFocus;
+  document.getElementById('focusCloseBtn').onclick = closeFocusMode;
+}
+
+function startFocus() {
+  if (focusTimer) return;
+  focusTimer = setInterval(function() {
+    focusSeconds--;
+    if (focusSeconds <= 0) {
+      clearInterval(focusTimer);
+      focusTimer = null;
+      if (focusMode === 'work') {
+        // 完成一个番茄钟，记录
+        focusTodayMinutes += 25;
+        dbAdd('focusSessions', { id: genId(), date: todayStr(), minutes: 25, type: 'work', completedAt: Date.now() });
+        focusMode = 'break';
+        focusSeconds = 5 * 60;
+        document.getElementById('focusLabel').textContent = '休息时间';
+        showToast('专注完成！休息5分钟', 'success');
+      } else {
+        focusMode = 'work';
+        focusSeconds = 25 * 60;
+        document.getElementById('focusLabel').textContent = '专注时间';
+        showToast('休息结束，继续加油', 'info');
+      }
+      updateFocusDisplay();
+      startFocus(); // 自动开始下一轮
+    }
+    updateFocusDisplay();
+  }, 1000);
+}
+
+function pauseFocus() {
+  if (focusTimer) { clearInterval(focusTimer); focusTimer = null; }
+}
+
+function resetFocus() {
+  pauseFocus();
+  focusSeconds = focusMode === 'work' ? 25 * 60 : 5 * 60;
+  updateFocusDisplay();
+}
+
+function closeFocusMode() {
+  pauseFocus();
+  document.getElementById('focusOverlay').classList.remove('active');
+}
+
+function updateFocusDisplay() {
+  const min = Math.floor(focusSeconds / 60);
+  const sec = focusSeconds % 60;
+  document.getElementById('focusTimer').textContent = String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+  document.getElementById('focusStats').textContent = '今日已专注 ' + focusTodayMinutes + ' 分钟';
+}
+
+// ===== 自动备份 =====
+function checkAutoBackup() {
+  dbGet('settings', 'autoBackup').then(function(config) {
+    if (!config || !config.enabled) return;
+    const lastBackup = config.lastBackup || 0;
+    const now = Date.now();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    if (now - lastBackup > weekMs) {
+      doAutoBackup();
+    }
+  }).catch(function() {});
+}
+
+function doAutoBackup() {
+  const stores = STORE_NAMES;
+  Promise.all(stores.map(function(s) { return dbGetAll(s).catch(function() { return []; }); })).then(function(results) {
+    const data = { version: '1.0.0', exportedAt: new Date().toISOString(), stores: {} };
+    stores.forEach(function(s, i) { data.stores[s] = results[i]; });
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'personal-app-auto-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    dbPut('settings', { id: 'autoBackup', enabled: true, lastBackup: Date.now() });
+    showToast('自动备份已完成', 'success');
+  }).catch(function() {});
 }
 
 function renderGreeting() {
@@ -6275,30 +6551,222 @@ function extractTextFromFile(file) {
 function renderExperiments() {
   const container = document.getElementById('page-experiments');
   container.innerHTML =
-    '<div class="exp-toolbar">' +
-      '<input type="text" class="exp-search" id="expSearchInput" placeholder="🔍 搜索实验标题、目的、标签...">' +
-      '<button class="settings-btn" id="expTemplateBtn" style="white-space:nowrap;">📋 实验模板</button>' +
+    '<div class="exp-subtabs">' +
+      '<button class="exp-subtab active" data-subtab="records">📋 实验记录</button>' +
+      '<button class="exp-subtab" data-subtab="literature">📚 文献管理</button>' +
+      '<button class="exp-subtab" data-subtab="reagents">🧪 试剂管理</button>' +
     '</div>' +
-    '<div class="exp-tag-filter" id="expTagFilter"></div>' +
-    '<div id="expListView"></div>' +
+    '<div id="expRecordsView">' +
+      '<div class="exp-toolbar">' +
+        '<input type="text" class="exp-search" id="expSearchInput" placeholder="🔍 搜索实验标题、目的、标签...">' +
+        '<button class="settings-btn" id="expTemplateBtn" style="white-space:nowrap;">📋 实验模板</button>' +
+      '</div>' +
+      '<div class="exp-tag-filter" id="expTagFilter"></div>' +
+      '<div id="expListView"></div>' +
+    '</div>' +
+    '<div id="expLiteratureView" style="display:none;"></div>' +
+    '<div id="expReagentsView" style="display:none;"></div>' +
     '<div id="expDetailView" style="display:none;"></div>';
 
   window._expSearchQuery = '';
   window._expActiveTag = null;
   window._expCurrentId = null;
+  window._expSubtab = 'records';
 
-  document.getElementById('expSearchInput').addEventListener('input', function() {
+  document.querySelectorAll('.exp-subtab').forEach(function(tab) {
+    tab.onclick = function() {
+      document.querySelectorAll('.exp-subtab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      window._expSubtab = tab.dataset.subtab;
+      document.getElementById('expRecordsView').style.display = tab.dataset.subtab === 'records' ? '' : 'none';
+      document.getElementById('expLiteratureView').style.display = tab.dataset.subtab === 'literature' ? '' : 'none';
+      document.getElementById('expReagentsView').style.display = tab.dataset.subtab === 'reagents' ? '' : 'none';
+      document.getElementById('expDetailView').style.display = 'none';
+      if (tab.dataset.subtab === 'records') { renderExpTagFilter(); renderExpList(); }
+      else if (tab.dataset.subtab === 'literature') renderLiterature();
+      else renderReagents();
+    };
+  });
+
+  const searchInput = document.getElementById('expSearchInput');
+  if (searchInput) searchInput.addEventListener('input', function() {
     window._expSearchQuery = this.value.toLowerCase();
     renderExpList();
   });
 
-  document.getElementById('expTemplateBtn').onclick = showExpTemplatePicker;
+  const templateBtn = document.getElementById('expTemplateBtn');
+  if (templateBtn) templateBtn.onclick = showExpTemplatePicker;
 
   renderExpTagFilter();
   renderExpList();
 
   const addBtn = document.getElementById('topbarAddBtn');
-  if (addBtn) addBtn.onclick = function() { openExpModal(); };
+  if (addBtn) addBtn.onclick = function() {
+    if (window._expSubtab === 'records') openExpModal();
+    else if (window._expSubtab === 'literature') openLiteratureModal();
+    else openReagentModal();
+  };
+}
+
+// ===== 文献管理 =====
+function renderLiterature() {
+  const container = document.getElementById('expLiteratureView');
+  dbGetAll('literature').then(function(items) {
+    if (items.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📚</div>还没有文献，点击右上角添加</div>';
+      return;
+    }
+    items.sort(function(a, b) { return (b.year || 0) - (a.year || 0); });
+    container.innerHTML = '<div class="lit-list">' + items.map(function(lit) {
+      return '<div class="lit-card" data-id="' + lit.id + '">' +
+        '<div class="lit-title">' + escapeHtml(lit.title) + '</div>' +
+        '<div class="lit-meta">' + escapeHtml(lit.authors || '') + (lit.year ? ' (' + lit.year + ')' : '') + ' · ' + escapeHtml(lit.journal || '') + '</div>' +
+        (lit.aiSummary ? '<div class="lit-summary">🤖 ' + escapeHtml(lit.aiSummary.slice(0, 100)) + (lit.aiSummary.length > 100 ? '...' : '') + '</div>' : '') +
+        '<div class="lit-tags">' + (lit.tags || []).map(function(t) { return '<span class="exp-tag">' + escapeHtml(t) + '</span>'; }).join('') + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+    container.querySelectorAll('.lit-card').forEach(function(card) {
+      card.onclick = function() { openLiteratureModal(card.dataset.id); };
+    });
+  });
+}
+
+function openLiteratureModal(litId) {
+  let existing = null;
+  const loadPromise = litId ? dbGet('literature', litId).then(function(l) { existing = l; }) : Promise.resolve();
+  loadPromise.then(function() {
+    openModal({
+      title: existing ? '编辑文献' : '添加文献',
+      bodyHTML:
+        '<div class="form-group"><label>文献标题</label><input type="text" id="litTitleInput" value="' + escapeHtml(existing ? existing.title : '') + '"></div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>作者</label><input type="text" id="litAuthorsInput" value="' + escapeHtml(existing ? existing.authors || '' : '') + '"></div>' +
+          '<div class="form-group"><label>年份</label><input type="number" id="litYearInput" value="' + (existing ? existing.year || '' : '') + '"></div>' +
+        '</div>' +
+        '<div class="form-group"><label>期刊/会议</label><input type="text" id="litJournalInput" value="' + escapeHtml(existing ? existing.journal || '' : '') + '"></div>' +
+        '<div class="form-group"><label>标签（逗号分隔）</label><input type="text" id="litTagsInput" value="' + escapeHtml(existing ? (existing.tags || []).join(', ') : '') + '"></div>' +
+        '<div class="form-group"><label>摘要</label><textarea id="litAbstractInput" rows="4">' + escapeHtml(existing ? existing.abstract || '' : '') + '</textarea></div>' +
+        (existing && existing.aiSummary ? '<div class="form-group"><label>🤖 AI摘要</label><textarea id="litAiSummaryInput" rows="3">' + escapeHtml(existing.aiSummary) + '</textarea></div>' : '') +
+        (!existing ? '<button class="settings-btn" id="litAiSummaryBtn" style="margin-top:8px;">🤖 生成AI摘要</button>' : '') +
+        (existing ? '<button class="danger-btn" id="deleteLitBtn" style="margin-top:10px;">🗑️ 删除</button>' : ''),
+      onConfirm: function() {
+        const title = document.getElementById('litTitleInput').value.trim();
+        if (!title) { showToast('请输入文献标题', 'error'); return false; }
+        const tagsStr = document.getElementById('litTagsInput').value.trim();
+        const data = {
+          title: title,
+          authors: document.getElementById('litAuthorsInput').value.trim(),
+          year: parseInt(document.getElementById('litYearInput').value) || null,
+          journal: document.getElementById('litJournalInput').value.trim(),
+          tags: tagsStr ? tagsStr.split(/[,，]/).map(function(t) { return t.trim(); }).filter(Boolean) : [],
+          abstract: document.getElementById('litAbstractInput').value.trim()
+        };
+        const aiSumEl = document.getElementById('litAiSummaryInput');
+        if (aiSumEl) data.aiSummary = aiSumEl.value.trim();
+        if (existing) { Object.assign(existing, data); dbPut('literature', existing).then(function() { renderLiterature(); showToast('已更新'); }); }
+        else { data.id = genId(); data.createdAt = Date.now(); dbAdd('literature', data).then(function() { renderLiterature(); showToast('已添加'); }); }
+      }
+    });
+    setTimeout(function() {
+      const aiBtn = document.getElementById('litAiSummaryBtn');
+      if (aiBtn) aiBtn.onclick = function() {
+        const title = document.getElementById('litTitleInput').value.trim();
+        const abstract = document.getElementById('litAbstractInput').value.trim();
+        if (!aiApiKey) { showToast('请先配置API Key', 'error'); return; }
+        if (!title && !abstract) { showToast('请输入标题或摘要', 'error'); return; }
+        aiBtn.textContent = '生成中...';
+        aiBtn.disabled = true;
+        callAiApi('请为以下文献生成一段100字以内的中文摘要，突出研究目的、方法和结论：\n标题：' + title + '\n摘要：' + abstract).then(function(result) {
+          const summaryArea = document.createElement('textarea');
+          summaryArea.id = 'litAiSummaryInput';
+          summaryArea.rows = 3;
+          summaryArea.value = result;
+          summaryArea.style.marginTop = '8px';
+          aiBtn.parentNode.insertBefore(summaryArea, aiBtn.nextSibling);
+          aiBtn.remove();
+          showToast('AI摘要已生成', 'success');
+        }).catch(function() {
+          aiBtn.textContent = '🤖 生成AI摘要';
+          aiBtn.disabled = false;
+          showToast('生成失败', 'error');
+        });
+      };
+      const delBtn = document.getElementById('deleteLitBtn');
+      if (delBtn) delBtn.onclick = function() { if (existing) { dbDelete('literature', existing.id).then(function() { closeModal(); renderLiterature(); showToast('已删除'); }); } };
+    }, 100);
+  });
+}
+
+// ===== 试剂管理 =====
+function renderReagents() {
+  const container = document.getElementById('expReagentsView');
+  dbGetAll('reagents').then(function(items) {
+    if (items.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">🧪</div>还没有试剂，点击右上角添加</div>';
+      return;
+    }
+    const today = new Date();
+    container.innerHTML = '<div class="reagent-list">' + items.map(function(r) {
+      const expDate = r.expiryDate ? new Date(r.expiryDate) : null;
+      const expired = expDate && expDate < today;
+      const warning = expDate && !expired && (expDate - today) / (1000 * 60 * 60 * 24) <= 30;
+      return '<div class="reagent-card" data-id="' + r.id + '" style="border-left:4px solid ' + (expired ? '#ff5252' : warning ? '#ffb74d' : '#64ffda') + ';">' +
+        '<div class="reagent-name">' + escapeHtml(r.name) + '</div>' +
+        '<div class="reagent-meta">批号: ' + escapeHtml(r.batchNo || '-') + ' | 规格: ' + escapeHtml(r.spec || '-') + '</div>' +
+        '<div class="reagent-meta">位置: ' + escapeHtml(r.location || '-') + ' | 库存: ' + (r.quantity || 0) + escapeHtml(r.unit || '') + '</div>' +
+        '<div class="reagent-expiry ' + (expired ? 'expired' : warning ? 'warning' : '') + '">有效期: ' + (r.expiryDate || '-') + (expired ? ' (已过期)' : warning ? ' (即将过期)' : '') + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+    container.querySelectorAll('.reagent-card').forEach(function(card) {
+      card.onclick = function() { openReagentModal(card.dataset.id); };
+    });
+  });
+}
+
+function openReagentModal(reagentId) {
+  let existing = null;
+  const loadPromise = reagentId ? dbGet('reagents', reagentId).then(function(r) { existing = r; }) : Promise.resolve();
+  loadPromise.then(function() {
+    openModal({
+      title: existing ? '编辑试剂' : '添加试剂',
+      bodyHTML:
+        '<div class="form-group"><label>试剂名称</label><input type="text" id="reagentNameInput" value="' + escapeHtml(existing ? existing.name : '') + '"></div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>批号</label><input type="text" id="reagentBatchInput" value="' + escapeHtml(existing ? existing.batchNo || '' : '') + '"></div>' +
+          '<div class="form-group"><label>规格</label><input type="text" id="reagentSpecInput" value="' + escapeHtml(existing ? existing.spec || '' : '') + '" placeholder="如：500g/瓶"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>存放位置</label><input type="text" id="reagentLocationInput" value="' + escapeHtml(existing ? existing.location || '' : '') + '" placeholder="如：A柜-2层"></div>' +
+          '<div class="form-group"><label>有效期</label><input type="date" id="reagentExpiryInput" value="' + (existing ? existing.expiryDate || '' : '') + '"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label>库存数量</label><input type="number" id="reagentQtyInput" value="' + (existing ? existing.quantity || 0 : 0) + '"></div>' +
+          '<div class="form-group"><label>单位</label><input type="text" id="reagentUnitInput" value="' + escapeHtml(existing ? existing.unit || 'g' : 'g') + '"></div>' +
+        '</div>' +
+        '<div class="form-group"><label>备注</label><textarea id="reagentNoteInput">' + escapeHtml(existing ? existing.note || '' : '') + '</textarea></div>' +
+        (existing ? '<button class="danger-btn" id="deleteReagentBtn" style="margin-top:10px;">🗑️ 删除</button>' : ''),
+      onConfirm: function() {
+        const name = document.getElementById('reagentNameInput').value.trim();
+        if (!name) { showToast('请输入试剂名称', 'error'); return false; }
+        const data = {
+          name: name,
+          batchNo: document.getElementById('reagentBatchInput').value.trim(),
+          spec: document.getElementById('reagentSpecInput').value.trim(),
+          location: document.getElementById('reagentLocationInput').value.trim(),
+          expiryDate: document.getElementById('reagentExpiryInput').value,
+          quantity: parseFloat(document.getElementById('reagentQtyInput').value) || 0,
+          unit: document.getElementById('reagentUnitInput').value.trim(),
+          note: document.getElementById('reagentNoteInput').value.trim()
+        };
+        if (existing) { Object.assign(existing, data); dbPut('reagents', existing).then(function() { renderReagents(); showToast('已更新'); }); }
+        else { data.id = genId(); data.createdAt = Date.now(); dbAdd('reagents', data).then(function() { renderReagents(); showToast('已添加'); }); }
+      }
+    });
+    setTimeout(function() {
+      const delBtn = document.getElementById('deleteReagentBtn');
+      if (delBtn) delBtn.onclick = function() { if (existing) { dbDelete('reagents', existing.id).then(function() { closeModal(); renderReagents(); showToast('已删除'); }); } };
+    }, 100);
+  });
 }
 
 // 生物制药常用实验模板
@@ -8886,6 +9354,13 @@ function renderSettings() {
       '<div class="settings-btn-row">' +
         '<button class="settings-btn primary" id="exportDataBtn">📥 导出全部数据 (JSON)</button>' +
       '</div>' +
+      '<div class="settings-toggle-row">' +
+        '<label class="toggle-label">' +
+          '<input type="checkbox" id="autoBackupToggle">' +
+          '<span class="toggle-slider"></span>' +
+          '<span>每周自动备份数据</span>' +
+        '</label>' +
+      '</div>' +
       '<div class="import-zone" id="importZone">' +
         '<div class="import-icon">📂</div>' +
         '<div class="import-text">点击或拖拽 JSON 备份文件到此处导入恢复</div>' +
@@ -9003,6 +9478,18 @@ function renderSettings() {
   }
 
   document.getElementById('exportDataBtn').addEventListener('click', exportAllData);
+
+  // 自动备份开关
+  const autoBackupToggle = document.getElementById('autoBackupToggle');
+  if (autoBackupToggle) {
+    dbGet('settings', 'autoBackup').then(function(config) {
+      autoBackupToggle.checked = !!(config && config.enabled);
+    }).catch(function() {});
+    autoBackupToggle.addEventListener('change', function() {
+      dbPut('settings', { id: 'autoBackup', enabled: this.checked, lastBackup: this.checked ? Date.now() : 0 });
+      showToast(this.checked ? '已开启每周自动备份' : '已关闭自动备份', 'success');
+    });
+  }
 
   const importZone = document.getElementById('importZone');
   const importFileInput = document.getElementById('importFileInput');
@@ -9871,6 +10358,7 @@ function init() {
     renderSidebar();
     initAiAssistant();
     navigateTo('home');
+    checkAutoBackup();
   }).catch(function(err) {
     console.error('DB init failed:', err);
     showToast('数据库初始化失败', 'error');
