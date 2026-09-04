@@ -6988,6 +6988,15 @@ function renderBooks() {
       '<button class="btn-primary" id="bookAiBtn" style="white-space:nowrap;">生成计划</button>' +
       '<button class="btn-secondary" id="bookClearAiBtn" style="white-space:nowrap;padding:6px 10px;font-size:12px;color:#ff6b6b;border-color:#ff6b6b;">清空</button>' +
     '</div>' +
+    '<div class="card" id="bookStatsCard" style="padding:14px;margin-bottom:14px;">' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);">📊 阅读统计</div>' +
+      '<div style="display:flex;gap:16px;margin-bottom:12px;">' +
+        '<div style="flex:1;text-align:center;"><div class="num" id="bookReadingCount" style="font-size:24px;font-weight:700;color:#9c27b0;">0</div><div style="font-size:11px;color:var(--text-light);">在读</div></div>' +
+        '<div style="flex:1;text-align:center;"><div class="num" id="bookFinishedCount" style="font-size:24px;font-weight:700;color:#4caf50;">0</div><div style="font-size:11px;color:var(--text-light);">已读完</div></div>' +
+        '<div style="flex:1;text-align:center;"><div class="num" id="bookWantCount" style="font-size:24px;font-weight:700;color:#ff9800;">0</div><div style="font-size:11px;color:var(--text-light);">想读</div></div>' +
+      '</div>' +
+      '<div id="bookTrendChart" style="display:flex;align-items:flex-end;gap:8px;height:60px;"></div>' +
+    '</div>' +
     '<div id="booksShelfView"></div>' +
     '<div class="book-detail-view" id="booksDetailView"></div>';
 
@@ -7005,6 +7014,7 @@ function renderBooks() {
   });
 
   showBooksShelf();
+  loadBookStats();
 
   const bookAiBtn = document.getElementById('bookAiBtn');
   if (bookAiBtn) bookAiBtn.addEventListener('click', showBookAiPlanForm);
@@ -7030,6 +7040,49 @@ function renderBooks() {
 
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.onclick = function() { openAddBookModal(); };
+}
+
+// 加载读书统计和趋势
+function loadBookStats() {
+  dbGetAll('books').then(function(all) {
+    const reading = all.filter(function(b) { return b.status === 'reading'; }).length;
+    const finished = all.filter(function(b) { return b.status === 'finished'; }).length;
+    const want = all.filter(function(b) { return b.status === 'want'; }).length;
+    const readingEl = document.getElementById('bookReadingCount');
+    const finishedEl = document.getElementById('bookFinishedCount');
+    const wantEl = document.getElementById('bookWantCount');
+    if (readingEl) readingEl.textContent = reading;
+    if (finishedEl) finishedEl.textContent = finished;
+    if (wantEl) wantEl.textContent = want;
+
+    // 近7天阅读笔记趋势
+    const trendChart = document.getElementById('bookTrendChart');
+    if (trendChart) {
+      dbGetAll('bookNotes').then(function(notes) {
+        const byDate = {};
+        notes.forEach(function(n) {
+          const d = (n.createdAt ? new Date(n.createdAt) : new Date()).toISOString().slice(0,10);
+          if (!byDate[d]) byDate[d] = 0;
+          byDate[d]++;
+        });
+        let trendHTML = '';
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const ds = date.toISOString().slice(0,10);
+          const count = byDate[ds] || 0;
+          const barHeight = Math.max(count * 20, 4);
+          const isToday = i === 0;
+          trendHTML += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">' +
+            '<div style="font-size:10px;color:var(--text-light);">' + (count > 0 ? count + '篇' : '') + '</div>' +
+            '<div style="width:100%;height:' + barHeight + 'px;background:' + (count > 0 ? 'linear-gradient(to top,#9c27b0,#ba68c8)' : 'rgba(156,39,176,0.15)') + ';border-radius:4px 4px 0 0;min-height:4px;"></div>' +
+            '<div style="font-size:10px;color:' + (isToday ? '#9c27b0' : 'var(--text-light)') + ';">' + (date.getMonth()+1) + '/' + date.getDate() + '</div>' +
+          '</div>';
+        }
+        trendChart.innerHTML = trendHTML;
+      });
+    }
+  });
 }
 
 function showBooksShelf() {
