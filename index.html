@@ -6553,46 +6553,43 @@ function showWorkoutPlanPreview(data, rawReply) {
   openModal({
     title: '🏋️ 训练计划预览与编辑',
     bodyHTML: planHTML,
-    buttons: [
-      { text: '取消', close: true },
-      { text: '确认导入', class: 'btn-primary', action: function() {
-        // 收集编辑后的数据
-        const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
-        const scope = modal || document;
-        const newPlan = [];
-        data.plan.forEach(function(dayPlan, idx) {
-          const muscleInput = scope.querySelector('.day-muscle[data-day="' + idx + '"]');
-          const exRows = scope.querySelectorAll('.exercise-input-row[data-day="' + idx + '"]');
-          const exercises = [];
-          exRows.forEach(function(row) {
-            const name = row.querySelector('.ex-name') ? row.querySelector('.ex-name').value.trim() : '';
-            const sets = row.querySelector('.ex-sets') ? parseInt(row.querySelector('.ex-sets').value) || 3 : 3;
-            const reps = row.querySelector('.ex-reps') ? row.querySelector('.ex-reps').value.trim() : '12';
-            if (name) exercises.push({ name: name, weight: null, sets: sets, reps: reps, notes: '' });
+    confirmText: '确认导入',
+    onConfirm: function() {
+      // 收集编辑后的数据
+      const modal = document.querySelector('.modal') || document.querySelector('[class*="modal"]');
+      const scope = modal || document;
+      const newPlan = [];
+      data.plan.forEach(function(dayPlan, idx) {
+        const muscleInput = scope.querySelector('.day-muscle[data-day="' + idx + '"]');
+        const exRows = scope.querySelectorAll('.exercise-input-row[data-day="' + idx + '"]');
+        const exercises = [];
+        exRows.forEach(function(row) {
+          const name = row.querySelector('.ex-name') ? row.querySelector('.ex-name').value.trim() : '';
+          const sets = row.querySelector('.ex-sets') ? parseInt(row.querySelector('.ex-sets').value) || 3 : 3;
+          const reps = row.querySelector('.ex-reps') ? row.querySelector('.ex-reps').value.trim() : '12';
+          if (name) exercises.push({ name: name, weight: null, sets: sets, reps: reps, notes: '' });
+        });
+        const muscle = muscleInput ? muscleInput.value.trim() : (dayPlan.muscleGroup || '综合训练');
+        if (muscle || exercises.length > 0) {
+          newPlan.push({
+            day: dayPlan.day,
+            muscleGroup: muscle || '综合训练',
+            duration: 60,
+            exercises: exercises,
+            notes: ''
           });
-          const muscle = muscleInput ? muscleInput.value.trim() : (dayPlan.muscleGroup || '综合训练');
-          if (muscle || exercises.length > 0) {
-            newPlan.push({
-              day: dayPlan.day,
-              muscleGroup: muscle || '综合训练',
-              duration: 60,
-              exercises: exercises,
-              notes: ''
-            });
-          }
-        });
-        if (newPlan.length === 0) {
-          showToast('没有可导入的训练计划', 'error');
-          return;
         }
-        saveWorkoutPlanToDB({ plan: newPlan }).then(function(total) {
-          showToast('已导入 ' + newPlan.length + ' 天训练计划', 'success');
-          closeModal();
-          renderWorkouts();
-          setTimeout(function() { navigateTo('workouts'); }, 500);
-        });
-      }}
-    ]
+      });
+      if (newPlan.length === 0) {
+        showToast('没有可导入的训练计划', 'error');
+        return false;
+      }
+      saveWorkoutPlanToDB({ plan: newPlan }).then(function(total) {
+        showToast('已导入 ' + total + ' 天训练计划', 'success');
+        renderWorkouts();
+      });
+      return true;
+    }
   });
   
   // 绑定添加/删除动作和删除天的事件
