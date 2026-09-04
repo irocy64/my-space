@@ -10635,7 +10635,7 @@ function loadModuleStats() {
 }
 
 function exportAllData() {
-  const stores = ['tasks', 'media', 'english', 'experiments', 'files', 'workouts', 'meals', 'games', 'gameLogs', 'books', 'bookNotes', 'memo', 'settings', 'customItems'];
+  const stores = ['tasks', 'media', 'english', 'experiments', 'files', 'workouts', 'meals', 'games', 'gameLogs', 'books', 'bookNotes', 'memo', 'settings', 'customItems', 'schedule', 'academics', 'reagents', 'literature', 'focusSessions'];
   Promise.all(stores.map(function(s) { 
     return dbGetAll(s).catch(function() { return []; }); // store不存在时返回空数组
   })).then(function(results) {
