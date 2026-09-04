@@ -8923,17 +8923,22 @@ function estimateCalories(foodText) {
       else if (unit === '块') gram = num * 50;
     }
 
-    // 匹配食物
-    for (let i = 0; i < FOOD_CALORIE_DB.length; i++) {
-      const food = FOOD_CALORIE_DB[i];
-      const allNames = [food.name].concat(food.aliases);
-      for (let j = 0; j < allNames.length; j++) {
-        if (part.includes(allNames[j])) {
-          matched = food;
-          break;
-        }
+    // 匹配食物（最长名称优先，避免"燕麦粥"被识别成"粥"）
+    let allFoodNames = [];
+    FOOD_CALORIE_DB.forEach(function(food, idx) {
+      allFoodNames.push({ name: food.name, idx: idx, len: food.name.length });
+      food.aliases.forEach(function(alias) {
+        allFoodNames.push({ name: alias, idx: idx, len: alias.length });
+      });
+    });
+    // 按名称长度降序排序
+    allFoodNames.sort(function(a, b) { return b.len - a.len; });
+
+    for (let i = 0; i < allFoodNames.length; i++) {
+      if (part.includes(allFoodNames[i].name)) {
+        matched = FOOD_CALORIE_DB[allFoodNames[i].idx];
+        break;
       }
-      if (matched) break;
     }
 
     if (matched) {
