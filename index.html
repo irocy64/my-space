@@ -9138,6 +9138,30 @@ function checkCourseReminders() {
 // 每分钟检查一次课程提醒
 setInterval(checkCourseReminders, 60000);
 
+// ===== 英语单词本 =====
+const WORD_BOOK = [
+  { word: 'abandon', phonetic: '/əˈbændən/', meaning: 'v. 放弃，抛弃', example: 'He abandoned his car in the snow.' },
+  { word: 'ability', phonetic: '/əˈbɪləti/', meaning: 'n. 能力，才能', example: 'She has the ability to solve problems.' },
+  { word: 'absolute', phonetic: '/ˈæbsəluːt/', meaning: 'adj. 绝对的，完全的', example: 'I have absolute confidence in you.' },
+  { word: 'academic', phonetic: '/ˌækəˈdemɪk/', meaning: 'adj. 学术的，学院的', example: 'His academic record is excellent.' },
+  { word: 'accept', phonetic: '/əkˈsept/', meaning: 'v. 接受，同意', example: 'Please accept my apology.' },
+  { word: 'access', phonetic: '/ˈækses/', meaning: 'n./v. 进入，访问', example: 'Students have access to the library.' },
+  { word: 'accident', phonetic: '/ˈæksɪdənt/', meaning: 'n. 事故，意外', example: 'The accident happened at noon.' },
+  { word: 'accompany', phonetic: '/əˈkʌmpəni/', meaning: 'v. 陪伴，伴随', example: 'She accompanied me to the hospital.' },
+  { word: 'accomplish', phonetic: '/əˈkʌmplɪʃ/', meaning: 'v. 完成，实现', example: 'We accomplished the task on time.' },
+  { word: 'accurate', phonetic: '/ˈækjərət/', meaning: 'adj. 准确的，精确的', example: 'The data is accurate and reliable.' },
+  { word: 'achieve', phonetic: '/əˈtʃiːv/', meaning: 'v. 达到，实现', example: 'He achieved his goal.' },
+  { word: 'acknowledge', phonetic: '/əkˈnɒlɪdʒ/', meaning: 'v. 承认，确认', example: 'She acknowledged her mistake.' },
+  { word: 'acquire', phonetic: '/əˈkwaɪər/', meaning: 'v. 获得，习得', example: 'He acquired a new skill.' },
+  { word: 'adapt', phonetic: '/əˈdæpt/', meaning: 'v. 适应，改编', example: 'Children adapt quickly to new environments.' },
+  { word: 'adequate', phonetic: '/ˈædɪkwət/', meaning: 'adj. 足够的，适当的', example: 'We have adequate time to prepare.' },
+  { word: 'adjust', phonetic: '/əˈdʒʌst/', meaning: 'v. 调整，适应', example: 'Please adjust the volume.' },
+  { word: 'admire', phonetic: '/ədˈmaɪər/', meaning: 'v. 钦佩，欣赏', example: 'I admire her courage.' },
+  { word: 'admit', phonetic: '/ədˈmɪt/', meaning: 'v. 承认，准许进入', example: 'He admitted his fault.' },
+  { word: 'adopt', phonetic: '/əˈdɒpt/', meaning: 'v. 采用，收养', example: 'They adopted a new policy.' },
+  { word: 'advance', phonetic: '/ədˈvɑːns/', meaning: 'v./n. 前进，进步', example: 'Technology advances rapidly.' }
+];
+
 // ===== 操作撤销 =====
 let _lastDeleted = null;
 let _undoTimer = null;
