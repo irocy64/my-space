@@ -2510,6 +2510,54 @@ body::before {
   font-weight: 600;
 }
 
+/* ===== Undo Toast ===== */
+.undo-toast {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  background: #333 !important;
+}
+.undo-toast button {
+  background: var(--primary);
+  color: #000;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* ===== Home Greeting ===== */
+.home-greeting {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+/* ===== Elder Mode ===== */
+body.elder-mode {
+  font-size: 17px;
+}
+body.elder-mode .nav-item {
+  padding: 14px 16px;
+  font-size: 16px;
+}
+body.elder-mode .card,
+body.elder-mode .meal-card,
+body.elder-mode .task-item {
+  padding: 16px;
+}
+body.elder-mode button {
+  font-size: 15px;
+  padding: 10px 18px;
+}
+body.elder-mode input,
+body.elder-mode textarea {
+  font-size: 16px;
+}
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -3714,7 +3762,15 @@ function showUndoBar(message, onUndo) {
 // ===== Page Renderers (placeholder stubs - will be implemented in later phases) =====
 function renderHome() {
   const container = document.getElementById('page-home');
+  const hour = new Date().getHours();
+  let greeting = '晚上好';
+  if (hour >= 5 && hour < 12) greeting = '早上好';
+  else if (hour >= 12 && hour < 14) greeting = '中午好';
+  else if (hour >= 14 && hour < 18) greeting = '下午好';
+  else if (hour >= 23 || hour < 5) greeting = '夜深了';
+
   container.innerHTML =
+    '<div class="home-greeting">' + greeting + '，今天也要加油哦 ✨</div>' +
     '<div class="home-search-bar">' +
       '<span class="home-search-icon">🔍</span>' +
       '<input type="text" class="home-search-input" id="homeSearchInput" placeholder="搜索模块、任务、实验、书籍..." autocomplete="off">' +
@@ -9032,6 +9088,111 @@ function editMeal(id) {
   });
 }
 
+// ===== 健身动作库 =====
+const EXERCISE_LIBRARY = [
+  { name: '深蹲', muscle: '腿部', sets: '4组×12次', tips: '膝盖不超过脚尖，背部挺直' },
+  { name: '硬拉', muscle: '背部/腿部', sets: '4组×10次', tips: '保持背部中立，杠铃贴近身体' },
+  { name: '卧推', muscle: '胸部', sets: '4组×10次', tips: '肩胛骨收紧，控制下放速度' },
+  { name: '引体向上', muscle: '背部', sets: '3组×力竭', tips: '全程控制，不要借力摆动' },
+  { name: '哑铃推举', muscle: '肩部', sets: '3组×12次', tips: '核心收紧，避免腰部代偿' },
+  { name: '哑铃弯举', muscle: '二头肌', sets: '3组×15次', tips: '大臂固定，只动小臂' },
+  { name: '三头下压', muscle: '三头肌', sets: '3组×15次', tips: '肘部固定，全程控制' },
+  { name: '平板支撑', muscle: '核心', sets: '3组×60秒', tips: '身体成一条直线，不要塌腰' },
+  { name: '臀桥', muscle: '臀部', sets: '4组×15次', tips: '顶峰收缩1秒，感受臀部发力' },
+  { name: '跑步', muscle: '有氧', sets: '30分钟', tips: '保持心率在最大心率60-70%' },
+  { name: '跳绳', muscle: '有氧', sets: '15分钟', tips: '前脚掌着地，膝盖微屈缓冲' },
+  { name: '波比跳', muscle: '全身', sets: '3组×10次', tips: '动作连贯，控制节奏' }
+];
+
+// ===== 操作撤销 =====
+let _lastDeleted = null;
+let _undoTimer = null;
+
+function safeDelete(storeName, id, itemName) {
+  dbGet(storeName, id).then(function(item) {
+    if (!item) return;
+    _lastDeleted = { store: storeName, data: item };
+    dbTx(storeName, 'readwrite', function(store) { store.delete(id); });
+    // 显示撤销提示
+    showUndoToast(itemName || '记录');
+  });
+}
+
+function showUndoToast(itemName) {
+  // 移除旧的撤销提示
+  const old = document.getElementById('undoToast');
+  if (old) old.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'undoToast';
+  toast.className = 'toast undo-toast';
+  toast.innerHTML = '<span>已删除' + escapeHtml(itemName) + '</span><button id="undoBtn">撤销</button>';
+  document.body.appendChild(toast);
+
+  document.getElementById('undoBtn').onclick = function() {
+    if (_lastDeleted) {
+      dbAdd(_lastDeleted.store, _lastDeleted.data);
+      toast.remove();
+      showToast('已恢复', 'success');
+      // 刷新当前页面
+      const activePage = document.querySelector('.page.active');
+      if (activePage) {
+        const module = activePage.id.replace('page-', '');
+        const renderFn = window['render' + module.charAt(0).toUpperCase() + module.slice(1)];
+        if (typeof renderFn === 'function') renderFn();
+      }
+    }
+  };
+
+  clearTimeout(_undoTimer);
+  _undoTimer = setTimeout(function() {
+    if (toast.parentNode) toast.remove();
+    _lastDeleted = null;
+  }, 5000);
+}
+
+// ===== 实验报告导出 =====
+function exportExperimentReport(expId) {
+  dbGet('experiments', expId).then(function(exp) {
+    if (!exp) { showToast('实验记录不存在', 'error'); return; }
+    const report = [
+      '实验报告',
+      '='.repeat(40),
+      '',
+      '实验名称：' + (exp.name || exp.title || '未命名'),
+      '实验日期：' + (exp.date || ''),
+      '实验目的：' + (exp.purpose || ''),
+      '',
+      '实验原理：',
+      exp.principle || '',
+      '',
+      '实验步骤：',
+      exp.steps || '',
+      '',
+      '实验结果：',
+      exp.results || '',
+      '',
+      '分析与讨论：',
+      exp.analysis || '',
+      '',
+      '结论：',
+      exp.conclusion || '',
+      '',
+      '='.repeat(40),
+      '导出时间：' + new Date().toLocaleString()
+    ].join('\n');
+
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '实验报告_' + (exp.name || exp.title || '未命名') + '_' + todayStr() + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('实验报告已导出', 'success');
+  });
+}
+
 // ===== 食物热量数据库 =====
 const FOOD_CALORIE_DB = [
   // 主食
@@ -10117,6 +10278,13 @@ function renderSettings() {
           '<span>每周自动备份数据</span>' +
         '</label>' +
       '</div>' +
+      '<div class="settings-toggle-row">' +
+        '<label class="toggle-label">' +
+          '<input type="checkbox" id="elderModeToggle">' +
+          '<span class="toggle-slider"></span>' +
+          '<span>长辈模式（大字体、简洁界面）</span>' +
+        '</label>' +
+      '</div>' +
       '<div class="import-zone" id="importZone">' +
         '<div class="import-icon">📂</div>' +
         '<div class="import-text">点击或拖拽 JSON 备份文件到此处导入恢复</div>' +
@@ -10244,6 +10412,20 @@ function renderSettings() {
     autoBackupToggle.addEventListener('change', function() {
       dbPut('settings', { id: 'autoBackup', enabled: this.checked, lastBackup: this.checked ? Date.now() : 0 });
       showToast(this.checked ? '已开启每周自动备份' : '已关闭自动备份', 'success');
+    });
+  }
+
+  // 长辈模式
+  const elderModeToggle = document.getElementById('elderModeToggle');
+  if (elderModeToggle) {
+    dbGet('settings', 'elderMode').then(function(config) {
+      elderModeToggle.checked = !!(config && config.enabled);
+      if (elderModeToggle.checked) document.body.classList.add('elder-mode');
+    }).catch(function() {});
+    elderModeToggle.addEventListener('change', function() {
+      dbPut('settings', { id: 'elderMode', enabled: this.checked });
+      document.body.classList.toggle('elder-mode', this.checked);
+      showToast(this.checked ? '已开启长辈模式' : '已关闭长辈模式', 'success');
     });
   }
 
@@ -11243,6 +11425,19 @@ function init() {
     if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
       e.preventDefault();
       openGlobalSearch();
+    }
+    // Alt+数字键切换模块 (1-9, 0)
+    if (e.altKey && /^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      const modules = ['home', 'tasks', 'schedule', 'academics', 'media', 'english', 'experiments', 'workouts', 'meals', 'games'];
+      const idx = e.key === '0' ? 9 : parseInt(e.key) - 1;
+      if (modules[idx]) navigateTo(modules[idx]);
+    }
+    // Ctrl+N 新建
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      const addBtn = document.getElementById('topbarAddBtn');
+      if (addBtn) addBtn.click();
     }
   });
   // 咒力粒子背景
