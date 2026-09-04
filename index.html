@@ -2115,6 +2115,52 @@ body::before {
 .ecd-days { font-size: 18px; font-weight: 700; color: var(--primary); }
 .ecd-days.urgent { color: #ff5252; }
 
+/* ===== Experiment Templates ===== */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.template-card {
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.template-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  transform: translateY(-2px);
+}
+.template-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 6px;
+}
+.template-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.template-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--purple-light);
+  color: var(--purple);
+  border-radius: 10px;
+}
+.template-purpose {
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
 /* ===== Experiments Module ===== */
 .exp-toolbar {
   display: flex;
@@ -6231,6 +6277,7 @@ function renderExperiments() {
   container.innerHTML =
     '<div class="exp-toolbar">' +
       '<input type="text" class="exp-search" id="expSearchInput" placeholder="🔍 搜索实验标题、目的、标签...">' +
+      '<button class="settings-btn" id="expTemplateBtn" style="white-space:nowrap;">📋 实验模板</button>' +
     '</div>' +
     '<div class="exp-tag-filter" id="expTagFilter"></div>' +
     '<div id="expListView"></div>' +
@@ -6245,11 +6292,124 @@ function renderExperiments() {
     renderExpList();
   });
 
+  document.getElementById('expTemplateBtn').onclick = showExpTemplatePicker;
+
   renderExpTagFilter();
   renderExpList();
 
   const addBtn = document.getElementById('topbarAddBtn');
   if (addBtn) addBtn.onclick = function() { openExpModal(); };
+}
+
+// 生物制药常用实验模板
+const EXP_TEMPLATES = [
+  {
+    name: 'HPLC检测',
+    tags: ['分析化学', 'HPLC', '含量测定'],
+    purpose: '采用高效液相色谱法测定样品中目标成分的含量',
+    principle: '利用不同物质在固定相和流动相之间分配系数的差异，实现混合物的分离和定量分析。',
+    steps: '1. 色谱条件：C18柱（250×4.6mm，5μm），流动相：甲醇-水（70:30），流速1.0mL/min，检测波长254nm，柱温30℃\n2. 对照品溶液制备：精密称取对照品适量，加甲醇溶解并定容\n3. 供试品溶液制备：取样品适量，精密称定，加甲醇超声提取30min，滤过\n4. 进样测定：分别进样对照品和供试品各20μL，记录色谱图\n5. 按外标法以峰面积计算含量',
+    observations: '记录各色谱峰的保留时间、峰面积、分离度；观察基线是否平稳，有无杂峰干扰',
+    results: '',
+    conclusion: ''
+  },
+  {
+    name: '革兰氏染色',
+    tags: ['微生物学', '染色', '形态观察'],
+    purpose: '通过革兰氏染色鉴别细菌的革兰氏阳性/阴性，观察细菌形态',
+    principle: '革兰氏阳性菌细胞壁肽聚糖层厚，乙醇脱色时结晶紫-碘复合物不易透出，呈紫色；革兰氏阴性菌肽聚糖层薄，脂质含量高，乙醇脱色后复染呈红色。',
+    steps: '1. 涂片：取洁净载玻片，滴生理盐水，挑取菌落均匀涂布\n2. 干燥固定：自然干燥后，火焰固定2-3次\n3. 初染：结晶紫染色1min，水洗\n4. 媒染：碘液作用1min，水洗\n5. 脱色：95%乙醇脱色20-30s，水洗\n6. 复染：番红染色1min，水洗，干燥\n7. 镜检：油镜下观察',
+    observations: '记录菌体颜色（紫色/红色）、形态（球菌/杆菌）、排列方式',
+    results: '',
+    conclusion: ''
+  },
+  {
+    name: '质粒提取（碱裂解法）',
+    tags: ['分子生物学', '质粒', 'DNA提取'],
+    purpose: '从大肠杆菌中提取质粒DNA，用于后续酶切、转化等实验',
+    principle: '碱性条件下细菌裂解，染色体DNA和蛋白质变性沉淀，质粒DNA因超螺旋结构保持可溶性，通过离心分离纯化。',
+    steps: '1. 收菌：取1.5mL菌液，12000rpm离心1min，弃上清\n2. 重悬：加250μL Solution I（含RNase），涡旋重悬\n3. 裂解：加250μL Solution II，轻柔颠倒4-6次，室温2min\n4. 中和：加350μL Solution III，立即轻柔颠倒，冰浴5min\n5. 离心：12000rpm离心10min，取上清\n6. 过柱：上清加入吸附柱，12000rpm离心1min\n7. 漂洗：加700μL漂洗液，12000rpm离心1min，重复一次\n8. 洗脱：空柱离心2min，加50μL洗脱液，静置2min，离心收集',
+    observations: '记录菌液OD600值、提取后DNA浓度（NanoDrop测定）、A260/A280比值',
+    results: '',
+    conclusion: ''
+  },
+  {
+    name: 'PCR扩增',
+    tags: ['分子生物学', 'PCR', '基因扩增'],
+    purpose: '体外扩增特定DNA片段，用于克隆、检测等后续实验',
+    principle: '通过变性-退火-延伸的循环反应，在Taq DNA聚合酶作用下，以引物为起点特异性扩增目标DNA片段。',
+    steps: '1. 反应体系（50μL）：模板DNA 1μL，上下游引物各1μL（10μM），dNTP 4μL（2.5mM），10×Buffer 5μL，Taq酶0.5μL，ddH2O 37.5μL\n2. 反应程序：95℃预变性5min；95℃变性30s，55℃退火30s，72℃延伸1min（按片段长度调整），30个循环；72℃终延伸10min\n3. 电泳检测：取5μL PCR产物，1%琼脂糖凝胶电泳，120V 20min，凝胶成像系统观察',
+    observations: '记录电泳条带大小、亮度、有无非特异性扩增、引物二聚体',
+    results: '',
+    conclusion: ''
+  },
+  {
+    name: '细胞培养与传代',
+    tags: ['细胞生物学', '细胞培养', '传代'],
+    purpose: '维持细胞株的正常生长和传代，为后续实验提供细胞材料',
+    principle: '贴壁细胞在培养瓶中生长至汇合度80-90%时，用胰蛋白酶消化使细胞脱落，分瓶继续培养。',
+    steps: '1. 准备：超净台紫外消毒30min，预热培养基、PBS、胰酶\n2. 观察：显微镜下观察细胞形态和汇合度\n3. 清洗：弃旧培养基，PBS清洗2次\n4. 消化：加适量0.25%胰酶，37℃消化1-3min\n5. 终止：加含血清培养基终止消化，吹打制成细胞悬液\n6. 分瓶：按1:3或1:4比例分瓶，补加新鲜培养基\n7. 培养：放入37℃、5%CO2培养箱',
+    observations: '记录细胞形态、汇合度、活率（台盼蓝染色）、有无污染',
+    results: '',
+    conclusion: ''
+  },
+  {
+    name: '紫外分光光度法测定',
+    tags: ['分析化学', 'UV-Vis', '含量测定'],
+    purpose: '利用物质对紫外光的特征吸收进行定性和定量分析',
+    principle: '朗伯-比尔定律：A=εbc，在一定浓度范围内，吸光度与溶液浓度成正比。',
+    steps: '1. 光谱扫描：取对照品溶液在200-400nm范围扫描，确定最大吸收波长\n2. 标准曲线：配制系列浓度对照品溶液，在最大吸收波长测定吸光度，绘制标准曲线\n3. 样品测定：取供试品溶液，同法测定吸光度\n4. 计算：根据标准曲线计算样品浓度和含量',
+    observations: '记录最大吸收波长、标准曲线相关系数R²、样品吸光度值',
+    results: '',
+    conclusion: ''
+  },
+  {
+    name: '蛋白质含量测定（BCA法）',
+    tags: ['生物化学', '蛋白质', '定量'],
+    purpose: '测定样品中蛋白质的浓度',
+    principle: '碱性条件下蛋白质将Cu²⁺还原为Cu⁺，BCA试剂与Cu⁺结合形成紫色复合物，在562nm处有强吸收，吸光度与蛋白质浓度成正比。',
+    steps: '1. BCA工作液配制：A液:B液=50:1混合\n2. 标准曲线：取BSA标准品（0、0.025、0.05、0.1、0.2、0.4、0.8、1.0mg/mL）各25μL\n3. 加样：样品和标准品各25μL加入96孔板，每孔加200μL BCA工作液\n4. 孵育：37℃孵育30min\n5. 测定：酶标仪562nm测定吸光度\n6. 计算：根据标准曲线计算样品蛋白浓度',
+    observations: '记录标准曲线R²值、各样品吸光度、计算浓度',
+    results: '',
+    conclusion: ''
+  },
+  {
+    name: 'SDS-PAGE电泳',
+    tags: ['生物化学', '电泳', '蛋白质分离'],
+    purpose: '分离蛋白质并分析其分子量和纯度',
+    principle: 'SDS使蛋白质变性并带负电荷，在聚丙烯酰胺凝胶中按分子量大小迁移，实现分离。',
+    steps: '1. 制胶：分离胶（12%）和浓缩胶（5%）\n2. 样品处理：蛋白样品加Loading Buffer，100℃煮沸5min\n3. 上样：每孔加10-20μL样品，同时加蛋白Marker\n4. 电泳：浓缩胶80V，分离胶120V，至溴酚蓝到达胶底\n5. 染色：考马斯亮蓝染色1h\n6. 脱色：脱色液脱色至条带清晰\n7. 成像分析',
+    observations: '记录蛋白条带位置、分子量估算、纯度、有无降解',
+    results: '',
+    conclusion: ''
+  }
+];
+
+function showExpTemplatePicker() {
+  openModal({
+    title: '选择实验模板',
+    bodyHTML:
+      '<div class="template-grid">' +
+      EXP_TEMPLATES.map(function(t, i) {
+        return '<div class="template-card" data-idx="' + i + '">' +
+          '<div class="template-name">' + t.name + '</div>' +
+          '<div class="template-tags">' + (t.tags || []).map(function(tag) { return '<span class="template-tag">' + tag + '</span>'; }).join('') + '</div>' +
+          '<div class="template-purpose">' + escapeHtml(t.purpose.slice(0, 50)) + '...</div>' +
+        '</div>';
+      }).join('') +
+      '</div>',
+    hideConfirm: true
+  });
+  setTimeout(function() {
+    document.querySelectorAll('.template-card').forEach(function(card) {
+      card.onclick = function() {
+        const idx = parseInt(card.dataset.idx);
+        const t = EXP_TEMPLATES[idx];
+        closeModal();
+        openExpModal(null, t);
+      };
+    });
+  }, 100);
 }
 
 function renderExpTagFilter() {
@@ -6480,8 +6640,9 @@ function deleteExpFile(expId, fileId) {
   });
 }
 
-function openExpModal(existing) {
+function openExpModal(existing, template) {
   const isEdit = !!existing;
+  const useTemplate = !!template && !existing;
   window._newExpPendingFiles = [];
 
   const uploadSection = isEdit ? '' :
@@ -6501,16 +6662,16 @@ function openExpModal(existing) {
     bodyHTML:
       uploadSection +
       '<div class="form-row">' +
-        '<div class="form-group"><label>实验标题</label><input type="text" id="expTitleInput" value="' + escapeHtml(existing ? (existing.title || '') : '') + '"></div>' +
+        '<div class="form-group"><label>实验标题</label><input type="text" id="expTitleInput" value="' + escapeHtml(existing ? (existing.title || '') : (useTemplate ? template.name : '')) + '"></div>' +
         '<div class="form-group"><label>日期</label><input type="date" id="expDateInput" value="' + (existing ? (existing.date || '') : todayStr()) + '"></div>' +
       '</div>' +
-      '<div class="form-group"><label>标签（用逗号分隔）</label><input type="text" id="expTagsInput" value="' + escapeHtml(existing ? ((existing.tags || []).join(', ')) : '') + '"></div>' +
-      '<div class="form-group"><label>实验目的</label><textarea id="expPurposeInput">' + escapeHtml(existing ? (existing.purpose || '') : '') + '</textarea></div>' +
-      '<div class="form-group"><label>实验原理</label><textarea id="expPrincipleInput" placeholder="AI可从报告中自动提取实验原理">' + escapeHtml(existing ? (existing.principle || '') : '') + '</textarea></div>' +
-      '<div class="form-group"><label>实验步骤</label><textarea id="expStepsInput">' + escapeHtml(existing ? (existing.steps || '') : '') + '</textarea></div>' +
-      '<div class="form-group"><label>实验现象</label><textarea id="expObservationsInput">' + escapeHtml(existing ? (existing.observations || '') : '') + '</textarea></div>' +
-      '<div class="form-group"><label>实验结果</label><textarea id="expResultsInput">' + escapeHtml(existing ? (existing.results || '') : '') + '</textarea></div>' +
-      '<div class="form-group"><label>结论</label><textarea id="expConclusionInput">' + escapeHtml(existing ? (existing.conclusion || '') : '') + '</textarea></div>',
+      '<div class="form-group"><label>标签（用逗号分隔）</label><input type="text" id="expTagsInput" value="' + escapeHtml(existing ? (existing.tags || []).join(', ') : (useTemplate ? (template.tags || []).join(', ') : '')) + '"></div>' +
+      '<div class="form-group"><label>实验目的</label><textarea id="expPurposeInput">' + escapeHtml(existing ? (existing.purpose || '') : (useTemplate ? template.purpose : '')) + '</textarea></div>' +
+      '<div class="form-group"><label>实验原理</label><textarea id="expPrincipleInput" placeholder="AI可从报告中自动提取实验原理">' + escapeHtml(existing ? (existing.principle || '') : (useTemplate ? template.principle : '')) + '</textarea></div>' +
+      '<div class="form-group"><label>实验步骤</label><textarea id="expStepsInput">' + escapeHtml(existing ? (existing.steps || '') : (useTemplate ? template.steps : '')) + '</textarea></div>' +
+      '<div class="form-group"><label>实验现象</label><textarea id="expObservationsInput">' + escapeHtml(existing ? (existing.observations || '') : (useTemplate ? template.observations : '')) + '</textarea></div>' +
+      '<div class="form-group"><label>实验结果</label><textarea id="expResultsInput">' + escapeHtml(existing ? (existing.results || '') : (useTemplate ? template.results : '')) + '</textarea></div>' +
+      '<div class="form-group"><label>结论</label><textarea id="expConclusionInput">' + escapeHtml(existing ? (existing.conclusion || '') : (useTemplate ? template.conclusion : '')) + '</textarea></div>',
     onConfirm: function() {
       const title = document.getElementById('expTitleInput').value.trim();
       if (!title) { showToast('请输入实验标题', 'error'); return false; }
