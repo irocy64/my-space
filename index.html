@@ -6224,9 +6224,7 @@ function showWorkoutAiPlanForm() {
         confirmBtn.disabled = true;
         confirmBtn.style.opacity = '0.6';
       }
-      generateWorkoutAiPlan(goal, days, weeks, level).then(function() {
-        closeModal();
-      }).catch(function() {
+      generateWorkoutAiPlan(goal, days, weeks, level).catch(function() {
         if (confirmBtn) {
           confirmBtn.textContent = '开始生成';
           confirmBtn.disabled = false;
