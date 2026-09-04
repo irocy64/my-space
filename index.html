@@ -47,6 +47,27 @@
   --c-settings: #90a4ae;
 }
 
+/* 浅色主题 */
+body.light-theme {
+  --bg: #f5f7fa;
+  --card: rgba(255, 255, 255, 0.95);
+  --card-solid: #ffffff;
+  --border: rgba(79, 195, 247, 0.4);
+  --border-light: rgba(79, 195, 247, 0.2);
+  --text: #1a2332;
+  --text-light: #5a6b85;
+  --primary: #0288d1;
+  --primary-light: rgba(2, 136, 209, 0.1);
+  --primary-glow: rgba(2, 136, 209, 0.3);
+  --sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f0f4f8 100%);
+  --sidebar-text: rgba(26, 35, 50, 0.6);
+  --sidebar-active: rgba(2, 136, 209, 0.12);
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+  --glow-blue: 0 0 12px rgba(2, 136, 209, 0.2);
+  --glow-blue-strong: 0 0 20px rgba(2, 136, 209, 0.35);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -7620,6 +7641,14 @@ function renderSettings() {
       '<div style="font-size:12px;color:var(--text-light);">提醒内容：汇总当天所有未完成任务，浏览器推送通知。需保持页面打开。</div>' +
     '</div>' +
     '<div class="settings-section">' +
+      '<div class="section-title">🎨 外观设置</div>' +
+      '<div style="display:flex;gap:12px;align-items:center;">' +
+        '<label style="font-size:13px;color:var(--text);">主题：</label>' +
+        '<button class="btn-secondary" id="themeDarkBtn" style="padding:6px 16px;font-size:13px;">🌙 深色</button>' +
+        '<button class="btn-secondary" id="themeLightBtn" style="padding:6px 16px;font-size:13px;">☀️ 浅色</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="settings-section">' +
       '<div class="section-title">📊 各模块数据统计</div>' +
       '<div class="module-stats-grid" id="moduleStatsGrid"></div>' +
     '</div>' +
@@ -7718,6 +7747,27 @@ function renderSettings() {
   // 页面加载时如果已开启提醒，启动检查
   if (localStorage.getItem('reminderEnabled') === '1') {
     startReminderCheck();
+  }
+
+  // 主题切换
+  const themeDarkBtn = document.getElementById('themeDarkBtn');
+  const themeLightBtn = document.getElementById('themeLightBtn');
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+    localStorage.setItem('theme', theme);
+  }
+  // 初始化主题
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  applyTheme(savedTheme);
+  if (themeDarkBtn) {
+    themeDarkBtn.addEventListener('click', function() { applyTheme('dark'); showToast('已切换到深色主题', 'success'); });
+  }
+  if (themeLightBtn) {
+    themeLightBtn.addEventListener('click', function() { applyTheme('light'); showToast('已切换到浅色主题', 'success'); });
   }
 
   document.getElementById('exportDataBtn').addEventListener('click', exportAllData);
