@@ -3091,7 +3091,7 @@ function renderHome() {
   container.innerHTML =
     '<div class="home-search-bar">' +
       '<span class="home-search-icon">🔍</span>' +
-      '<input type="text" class="home-search-input" id="homeSearchInput" placeholder="搜索模块，如：英语、健身、实验..." autocomplete="off">' +
+      '<input type="text" class="home-search-input" id="homeSearchInput" placeholder="搜索模块、任务、实验、书籍..." autocomplete="off">' +
       '<div class="home-search-suggestions" id="homeSearchSuggestions"></div>' +
     '</div>' +
     '<div class="home-datetime-bar">' +
@@ -3195,7 +3195,7 @@ function initHomeSearch() {
 
   let activeIndex = -1;
 
-  function showSuggestions(query) {
+  async function showSuggestions(query) {
     const q = query.trim().toLowerCase();
     if (!q) {
       suggestions.classList.remove('show');
@@ -3207,23 +3207,53 @@ function initHomeSearch() {
         return { id: m.id, name: m.name, icon: m.icon || '📝', keywords: [m.name, '自定义'] };
       })
     );
-    const matched = allModules.filter(function(m) {
+    const matchedModules = allModules.filter(function(m) {
       return m.name.toLowerCase().indexOf(q) > -1 ||
              m.keywords.some(function(k) { return k.toLowerCase().indexOf(q) > -1; });
     });
-    if (matched.length === 0) {
-      suggestions.innerHTML = '<div class="home-search-suggestion-item" style="cursor:default;color:var(--text-light);">没有找到匹配的模块</div>';
+    
+    // 搜索内容（任务、实验、书籍）
+    let contentResults = [];
+    try {
+      const [tasks, exps, books] = await Promise.all([
+        dbGetAll('tasks'),
+        dbGetAll('experiments'),
+        dbGetAll('books')
+      ]);
+      tasks.forEach(function(t) {
+        if (t.content && t.content.toLowerCase().includes(q)) {
+          contentResults.push({ type: 'task', icon: '✅', title: t.content.slice(0, 30), desc: '今日任务', moduleId: 'tasks' });
+        }
+      });
+      exps.forEach(function(e) {
+        if (e.title && e.title.toLowerCase().includes(q)) {
+          contentResults.push({ type: 'exp', icon: '🧪', title: e.title.slice(0, 30), desc: '实验记录', moduleId: 'experiments' });
+        }
+      });
+      books.forEach(function(b) {
+        if (b.title && b.title.toLowerCase().includes(q)) {
+          contentResults.push({ type: 'book', icon: '📚', title: b.title.slice(0, 30), desc: '书籍', moduleId: 'books' });
+        }
+      });
+    } catch(e) {}
+    
+    const allResults = matchedModules.map(function(m) {
+      return { icon: m.icon, name: m.name, desc: '模块', moduleId: m.id, isModule: true };
+    }).concat(contentResults.slice(0, 5));
+    
+    if (allResults.length === 0) {
+      suggestions.innerHTML = '<div class="home-search-suggestion-item" style="cursor:default;color:var(--text-light);">没有找到匹配结果</div>';
     } else {
-      suggestions.innerHTML = matched.map(function(m, i) {
-        return '<div class="home-search-suggestion-item' + (i === activeIndex ? ' active' : '') + '" data-id="' + m.id + '" data-index="' + i + '">' +
+      suggestions.innerHTML = allResults.map(function(m, i) {
+        return '<div class="home-search-suggestion-item' + (i === activeIndex ? ' active' : '') + '" data-module="' + m.moduleId + '" data-index="' + i + '">' +
           '<span class="s-icon">' + m.icon + '</span>' +
-          '<span class="s-name">' + m.name + '</span>' +
-          '<span class="s-desc">点击跳转</span>' +
+          '<span class="s-name">' + escapeHtml(m.title || m.name) + '</span>' +
+          '<span class="s-desc">' + m.desc + '</span>' +
           '</div>';
       }).join('');
-      suggestions.querySelectorAll('.home-search-suggestion-item[data-id]').forEach(function(item) {
+      suggestions.querySelectorAll('.home-search-suggestion-item[data-module]').forEach(function(item) {
         item.addEventListener('click', function() {
-          navigateTo(item.dataset.id);
+          navigateTo(item.dataset.module);
           input.value = '';
           suggestions.classList.remove('show');
         });
@@ -3238,7 +3268,7 @@ function initHomeSearch() {
   });
 
   input.addEventListener('keydown', function(e) {
-    const items = suggestions.querySelectorAll('.home-search-suggestion-item[data-id]');
+    const items = suggestions.querySelectorAll('.home-search-suggestion-item[data-module]');
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       activeIndex = Math.min(activeIndex + 1, items.length - 1);
