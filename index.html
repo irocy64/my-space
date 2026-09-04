@@ -8434,7 +8434,9 @@ function loadModuleStats() {
 
 function exportAllData() {
   const stores = ['tasks', 'media', 'english', 'experiments', 'files', 'workouts', 'meals', 'games', 'gameLogs', 'books', 'bookNotes', 'memo', 'settings', 'customItems'];
-  Promise.all(stores.map(function(s) { return dbGetAll(s); })).then(function(results) {
+  Promise.all(stores.map(function(s) { 
+    return dbGetAll(s).catch(function() { return []; }); // store不存在时返回空数组
+  })).then(function(results) {
     const data = { version: '1.0.0', exportedAt: new Date().toISOString(), stores: {} };
     stores.forEach(function(s, i) { data.stores[s] = results[i]; });
     const json = JSON.stringify(data, function(key, value) {
@@ -8453,6 +8455,8 @@ function exportAllData() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('数据已导出');
+  }).catch(function(err) {
+    showToast('导出失败：' + err.message, 'error');
   });
 }
 
