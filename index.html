@@ -4785,7 +4785,7 @@ function showEnglishAiPlanForm() {
       const days = parseInt(document.getElementById('aiDaysInput').value) || 30;
       const hours = parseFloat(document.getElementById('aiHoursInput').value) || 2;
       // 显示loading状态
-      const confirmBtn = document.querySelector('.modal .modal-confirm, .modal [class*="confirm"]');
+      const confirmBtn = document.getElementById('modalConfirm');
       if (confirmBtn) {
         confirmBtn.textContent = '生成中...';
         confirmBtn.disabled = true;
@@ -6218,7 +6218,7 @@ function showWorkoutAiPlanForm() {
       const weeks = document.getElementById('workoutAiWeeks').value;
       const level = document.getElementById('workoutAiLevel').value;
       // 显示loading状态
-      const confirmBtn = document.querySelector('.modal .modal-confirm, .modal [class*="confirm"]');
+      const confirmBtn = document.getElementById('modalConfirm');
       if (confirmBtn) {
         confirmBtn.textContent = '生成中...';
         confirmBtn.disabled = true;
@@ -7596,7 +7596,7 @@ function showBookAiPlanForm() {
       const days = document.getElementById('bookAiDays').value;
       const time = document.getElementById('bookAiTime').value;
       // 显示loading状态
-      const confirmBtn = document.querySelector('.modal .modal-confirm, .modal [class*="confirm"]');
+      const confirmBtn = document.getElementById('modalConfirm');
       if (confirmBtn) {
         confirmBtn.textContent = '生成中...';
         confirmBtn.disabled = true;
