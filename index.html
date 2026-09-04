@@ -2511,7 +2511,7 @@ const CUSTOM_COLORS = ['#4fc3f7','#ff9800','#4caf50','#e91e63','#9c27b0','#ff572
 
 async function loadModuleConfig() {
   try {
-    const data = await dbTx('settings','readonly',function(s){ return s.get('moduleConfig'); });
+    const data = await dbGet('settings', 'moduleConfig');
     if (data && data.hiddenModules) moduleConfig = data;
   } catch(e) { console.warn('加载模块配置失败', e); }
 }
@@ -8581,12 +8581,12 @@ const AI_MODEL = 'doubao-seed-2-1-turbo-260628';
 
 async function loadAiKey() {
   try {
-    const data = await dbTx('settings','readonly',function(s){ return s.get('aiApiKey'); });
+    const data = await dbGet('settings', 'aiApiKey');
     if (data && data.key) {
       aiApiKey = data.key;
-      const input = document.getElementById('aiApiKeyInput');
+      const input = document.getElementById('settingsAiApiKey');
       if (input) input.value = data.key;
-      const status = document.getElementById('aiKeyStatus');
+      const status = document.getElementById('settingsAiKeyStatus');
       if (status) status.textContent = '已配置';
     }
   } catch(e) { console.warn('加载AI Key失败', e); }
@@ -9075,7 +9075,7 @@ async function saveAiHistory() {
 }
 async function loadAiHistory() {
   try {
-    const data = await dbTx('settings','readonly',function(s){ return s.get('aiHistory'); });
+    const data = await dbGet('settings', 'aiHistory');
     if (data && data.messages && data.messages.length > 0) {
       aiConversation = data.messages;
       const container = document.getElementById('aiMessages');
