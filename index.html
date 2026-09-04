@@ -3014,6 +3014,22 @@ function openModal(opts) {
     if (opts.onConfirm) {
       const result = opts.onConfirm();
       if (result === false) return; // prevent close
+      // 支持async onConfirm：如果返回Promise，等待完成后再关闭
+      if (result && typeof result.then === 'function') {
+        confirmBtn.disabled = true;
+        confirmBtn.style.opacity = '0.6';
+        result.then(function(res) {
+          if (res !== false) { closeModal(); cleanup(); }
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = '1';
+        }).catch(function(err) {
+          console.error('onConfirm error:', err);
+          showToast('操作失败：' + (err.message || err), 'error');
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = '1';
+        });
+        return;
+      }
     }
     closeModal();
     cleanup();
